@@ -3,17 +3,23 @@ Kaggle: House Prices: Advanced Regression Techniques
 
 https://www.kaggle.com/c/house-prices-advanced-regression-techniques/
 
-## Run TensorFlow Training + Predictions
+## Using TensorFlow
 
-```
-cd tensorflow/
-runipy exploratory_data_analysis.ipynb
-python autotrain.py
-```
+#### Training + Predictions
 
-## Run Amazon Machine Learning Training + Predictions
+    cd tensorflow/
+    runipy exploratory_data_analysis.ipynb
+    python autotrain.py
 
-```
-cd amazon_machine_learning/
-python main.py
-```
+## Amazon Machine Learning
+
+#### Training
+
+    cd amazon_machine_learning/
+    python main.py
+
+#### Predictions
+
+Edit and run:
+
+    python format_predictions.py
