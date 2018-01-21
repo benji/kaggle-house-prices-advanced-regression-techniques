@@ -1,0 +1,9 @@
+todo.txt
+history.txt
+**/*.pyc
+**/.ipynb_checkpoints/
+tensorflow/test.py
+tensorflow/test_transformed.csv
+tensorflow/train_transformed.csv
+tensorflow/predicted.csv
+
