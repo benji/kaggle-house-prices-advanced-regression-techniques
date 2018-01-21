@@ -1,0 +1,82 @@
+ColName,NumDistinctValues,HasNA,Type,Comments
+Id,9999,False,CATEGORICAL
+LotArea,1073,False,NUMERIC
+GrLivArea,861,False,NUMERIC
+BsmtUnfSF,780,False,NUMERIC
+1stFlrSF,753,False,NUMERIC
+TotalBsmtSF,721,False,NUMERIC
+SalePrice,663,False,NUMERIC
+BsmtFinSF1,637,False,NUMERIC
+GarageArea,441,False,NUMERIC
+2ndFlrSF,417,False,NUMERIC
+WoodDeckSF,274,False,NUMERIC
+OpenPorchSF,202,False,NUMERIC
+BsmtFinSF2,144,False,NUMERIC
+EnclosedPorch,120,False,NUMERIC
+YearBuilt,112,False,NUMERIC
+ScreenPorch,76,False,NUMERIC
+YearRemodAdd,61,False,NUMERIC
+Neighborhood,25,False,CATEGORICAL
+LowQualFinSF,24,False,NUMERIC
+MiscVal,21,False,NUMERIC
+3SsnPorch,20,False,NUMERIC
+Exterior2nd,16,False,CATEGORICAL
+MSSubClass,15,False,CATEGORICAL
+Exterior1st,15,False,CATEGORICAL
+TotRmsAbvGrd,12,False,NUMERIC
+MoSold,12,False,NUMERIC,might combine with yrsold
+OverallQual,10,False,NUMERIC
+Condition1,9,False,CATEGORICAL
+SaleType,9,False,CATEGORICAL
+OverallCond,9,False,NUMERIC
+Condition2,8,False,CATEGORICAL
+HouseStyle,8,False,CATEGORICAL
+BedroomAbvGr,8,False,NUMERIC
+RoofMatl,8,False,CATEGORICAL
+PoolArea,8,False,NUMERIC
+Functional,7,False,CATEGORICAL,can convert to numeric
+Foundation,6,False,CATEGORICAL
+SaleCondition,6,False,CATEGORICAL
+RoofStyle,6,False,CATEGORICAL
+Heating,6,False,CATEGORICAL
+YrSold,5,False,NUMERIC
+HeatingQC,5,False,CATEGORICAL,can convert to numeric
+MSZoning,5,False,CATEGORICAL
+BldgType,5,False,CATEGORICAL
+ExterCond,5,False,CATEGORICAL,can convert to numerical
+GarageCars,5,False,NUMERIC
+LotConfig,5,False,CATEGORICAL
+LandContour,4,False,CATEGORICAL,can convert to numerical
+ExterQual,4,False,CATEGORICAL,can convert to numerical
+KitchenQual,4,False,CATEGORICAL,can convert to numeric
+Fireplaces,4,False,NUMERIC
+BsmtFullBath,4,False,NUMERIC
+FullBath,4,False,NUMERIC
+KitchenAbvGr,4,False,NUMERIC
+LotShape,4,False,CATEGORICAL,can convert to numerical
+HalfBath,3,False,NUMERIC
+LandSlope,3,False,CATEGORICAL,can convert to numerical
+PavedDrive,3,False,CATEGORICAL,can convert to numerical
+BsmtHalfBath,3,False,NUMERIC
+Utilities,2,False,CATEGORICAL,can convert to numerical
+Street,2,False,BINARY
+CentralAir,2,False,BINARY
+PoolQC,3,True,CATEGORICAL,can convert to numeric
+MiscFeature,4,True,CATEGORICAL
+Alley,2,True,CATEGORICAL
+Fence,4,True,CATEGORICAL
+FireplaceQu,5,True,CATEGORICAL,can convert to numeric
+LotFrontage,110,True,NUMERIC
+GarageYrBlt,97,True,NUMERIC
+GarageType,6,True,CATEGORICAL,may convert to numeric
+GarageFinish,3,True,CATEGORICAL,can convert to numeric
+GarageQual,5,True,CATEGORICAL,can convert to numeric
+GarageCond,5,True,CATEGORICAL,can convert to numeric
+BsmtFinType2,6,True,CATEGORICAL,may convert to numerical
+BsmtExposure,4,True,CATEGORICAL,may convert to numerical
+BsmtFinType1,6,True,CATEGORICAL,may convert to numerical
+BsmtCond,4,True,CATEGORICAL,may convert to numerical
+BsmtQual,4,True,CATEGORICAL,may convert to numerical
+MasVnrArea,327,True,NUMERIC
+MasVnrType,4,True,CATEGORICAL
+Electrical,5,True,CATEGORICAL

@@ -1,9 +1,14 @@
 todo.txt
 history.txt
-**/*.pyc
-**/.ipynb_checkpoints/
-tensorflow/test.py
-tensorflow/test_transformed.csv
-tensorflow/train_transformed.csv
-tensorflow/predicted.csv
 
+**/*.pyc
+*/test.py
+
+**/.ipynb_checkpoints/
+
+*/test_transformed.csv
+*/train_transformed.csv
+*/predicted.csv
+
+amazon_machine_learning/aml_recipe.json
+amazon_machine_learning/aml_schema.json

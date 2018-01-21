@@ -1,0 +1,10 @@
+{
+  "Street": {
+    "Grvl": 0,
+    "Pave": 1
+  },
+  "CentralAir": {
+    "N": 0,
+    "Y": 1
+  }
+}
