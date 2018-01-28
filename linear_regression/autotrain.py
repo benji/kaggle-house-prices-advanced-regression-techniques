@@ -2,29 +2,46 @@ import pandas as pd
 import math, json, sys
 from tqdm import tqdm
 import numpy as np
-from sklearn import preprocessing, cross_validation, svm
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import shuffle
-import matplotlib.pyplot as plt
-from matplotlib import style
+from os import path
 
-from train import test_accuracy, generate_predictions, retain_columns, prepare_data
+sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
+from utils.utils import *
+from utils.Training import *
 
 pd.options.mode.chained_assignment = None  # default='warn'
-style.use('ggplot')
 
-df_train0 = pd.read_csv('train_transformed.csv')
-df_test0 = pd.read_csv('test_transformed.csv')
+df_train = pd.read_csv('../data/train.csv')
+df_test = pd.read_csv('../data/test.csv')
+schema = json.loads(open('../schema.json', 'r').read())
 
-y, df_train0, df_test0, test_ids = prepare_data(df_train0, df_test0)
+# special prep
+df_train['DateSold'] = df_train['YrSold'] + df_train['MoSold'] / 12.0
+df_test['DateSold'] = df_test['YrSold'] + df_test['MoSold'] / 12.0
 
-print len(df_train0.columns), 'columns in dataframe'
+# -4%!
+#outliers_LotArea = df_train['LotArea'][df_train['LotArea'] > 100000]
+#print outliers_LotArea
+#df_train = df_train.drop(outliers_LotArea.index)
 
-available_columns = list(df_train0.columns.values)
+t = Training(df_train, df_test, schema=schema)
+t.separate_out_value('PoolArea', 0, 'NoPool')
+t.logify_columns.append('SalePrice')  # +4%!
+t.logify_columns.extend(('LotArea', 'GrLivArea', '1stFlrSF'))  # +0.4%!
+t.fill_na_mean = True
+t.remove_outliers.extend((524, 1299))  # +3%!
+t.dummify_at_init = False
+t.dummify_drop_first = False
 
-n_passes = 100
-validated_columns = []
+t.prepare()
+
+available_columns = list(t.df_train.columns.values)
+
+n_passes = 10
+validated_columns = [ ]
+
 best_accuracy = 0
 making_progress = True
 df_testcols = pd.DataFrame(columns=['ColName', 'Accuracy'])
@@ -36,9 +53,10 @@ while (making_progress):
         #print 'Testing column', test_column
         test_columns = validated_columns + [test_column]
 
-        df_train, _ = retain_columns(test_columns, df_train0)
+        df_train = t.df_train[test_columns].copy()
 
-        accuracy = test_accuracy(df_train, y, passes=n_passes) * 100
+        df_train, _ = dummify_with_schema(schema,df_train)
+        accuracy = test_accuracy(df_train, t.labels, passes=n_passes) * 100
 
         #print 'Accuracy for column', test_column, ':', accuracy
         df_testcols.loc[len(df_testcols)] = [test_column, accuracy]
@@ -65,7 +83,10 @@ while (making_progress):
 print 'Final columns', validated_columns
 print 'Final accuracy', best_accuracy
 
-df_train, df_test = retain_columns(validated_columns, df_train0, df_test0)
+t.retain_columns(validated_columns)
 
-generate_predictions(y, df_train0, df_test0, test_ids)
+df_train, df_test = dummify_with_schema(t.schema, t.df_train, t.df_test)
+
+generate_predictions(
+    t.labels, df_train, df_test, t.test_ids)
 print "Predictions complete."
