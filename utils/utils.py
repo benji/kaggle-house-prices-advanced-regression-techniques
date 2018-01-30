@@ -52,7 +52,7 @@ def dummify_col_with_schema(col, schema, df_train, df_test=None):
 
     for nc in newcolumns:
         if df_train2[nc].nunique() == 1:
-            #print 'Dummy column', nc, 'has only 1 value', df_train2[nc].iloc[0]
+            #print 'Dummy column', nc, 'has only 1 value', df_train2[nc].iloc[0],', removing it.'
             df_train2.drop(nc, 1, inplace=True)
             meaningless_columns.append(nc)
         else:
@@ -162,9 +162,10 @@ def test_accuracy(df_train, y, passes=1):
         accuracy = clf.score(X_test, y_test)
         #print accuracy
 
-        if False:  #(accuracy > 10 or accuracy < -10):
+        if False:#(accuracy > 10 or accuracy < -10):
             print 'acc off', accuracy
             #pass
+            #df_train.to_csv('train.csv')
             #np.savetxt('expected.txt', y_test, fmt='%f')
             #np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
             #raise Exception('Accuracy is way off', accuracy)
@@ -198,9 +199,9 @@ def test_accuracy_debug(df_train, y, passes=1):
         accuracy = clf.score(X_test, y_test)
         #print accuracy
 
-        np.savetxt('test.txt', X_test, fmt='%f')
-        np.savetxt('expected.txt', y_test, fmt='%f')
-        np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
+        #np.savetxt('test.txt', X_test, fmt='%f')
+        #np.savetxt('expected.txt', y_test, fmt='%f')
+        #np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
 
         if False:  #(accuracy > 10 or accuracy < -10):
             print 'acc off', accuracy

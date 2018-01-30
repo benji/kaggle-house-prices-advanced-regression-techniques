@@ -10,8 +10,12 @@ from utils.Training import *
 t = training()
 t.train_columns = [
     'TotalSF', 'OverallQual', 'YearBuilt', 'OverallCond', 'LotArea',
-    'Neighborhood', 'BsmtFullBath', 'TotalBsmtSF', 'MoSold'
+    'BsmtFullBath', 'TotalBsmtSF', 'MoSold'
 ]
+
+t.dummify_at_init = True
+t.dummify_drop_first = False
+t.use_label_encoding = False
 
 t.prepare()
 

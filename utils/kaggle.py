@@ -24,24 +24,25 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 df_train = pd.read_csv('../data/train.csv')
 df_test = pd.read_csv('../data/test.csv')
-schema = json.loads(open('../schema.json', 'r').read())
-
-# special prep
-df_train['DateSold'] = df_train['YrSold'] + df_train['MoSold'] / 12.0
-df_test['DateSold'] = df_test['YrSold'] + df_test['MoSold'] / 12.0
-
-# -4%!
-#outliers_LotArea = df_train['LotArea'][df_train['LotArea'] > 100000]
-#print outliers_LotArea
-#df_train = df_train.drop(outliers_LotArea.index)
-
-#t.separate_out_value('PoolArea', 0, 'NoPool')
-
 schema = json.loads(open('../schema2.json', 'r').read())
-df_train = pd.read_csv('../data/train.csv')  #, dtype=get_pandas_types(schema))
-df_test = pd.read_csv('../data/test.csv')  #, dtype=get_pandas_types(schema))
+t = Training(df_train, df_test, schema=schema)
 
-# special prep
+# NA round 1
+
+for df in [df_train, df_test]:
+    df['BsmtUnfSF'][df['BsmtQual'].isnull()] = 0
+    df['BsmtFinSF1'][df['BsmtQual'].isnull()] = 0
+    df['BsmtFinSF2'][df['BsmtQual'].isnull()] = 0
+    df['BsmtHalfBath'][df['BsmtQual'].isnull()] = 0
+    df['BsmtFullBath'][df['BsmtQual'].isnull()] = 0
+    df['TotalBsmtSF'][df['BsmtQual'].isnull()] = 0
+
+    df["LotFrontage"].fillna(df_train["LotFrontage"].mean(), inplace=True)
+
+#.fillna(np.mean(df_train["LotFrontage"].values),inplace=True)
+
+# ADD CUSTOM FEATURES
+
 df_train['DateSold'] = df_train['YrSold'] + df_train['MoSold'] / 12.0
 df_test['DateSold'] = df_test['YrSold'] + df_test['MoSold'] / 12.0
 schema['columns']['DateSold'] = {'type': 'NUMERIC'}
@@ -52,13 +53,19 @@ df_test[
     'TotalSF'] = df_test['TotalBsmtSF'] + df_test['1stFlrSF'] + df_test['2ndFlrSF']
 schema['columns']['TotalSF'] = {'type': 'NUMERIC'}
 
+t.separate_out_value('PoolArea', 0, 'NoPool')
 
-# -4%!
-#outliers_LotArea = df_train['LotArea'][df_train['LotArea'] > 100000]
-#print outliers_LotArea
-#df_train = df_train.drop(outliers_LotArea.index)
+# HANDLE TYPOS IN THE DATA
 
-t = Training(df_train, df_test, schema=schema)
+t.replace_values.append(['Neighborhood', 'NAmes', 'NWAmes'])
+t.replace_values.append(['BldgType', '2fmCon', '2FmCon'])
+t.replace_values.append(['BldgType', 'Duplex', 'Duplx'])
+t.replace_values.append(['BldgType', 'Twnhs', 'TwnhsE'])
+t.replace_values.append(['Exterior2nd', 'Brk Cmn', 'BrkComm'])
+t.replace_values.append(['Exterior2nd', 'CmentBd', 'CemntBd'])
+t.replace_values.append(['Exterior2nd', 'Wd Shng', 'WdShing'])
+
+# NA round 2
 
 t.columns_na = {
     'PoolQC': 'None',
@@ -90,30 +97,21 @@ t.columns_na = {
     'MiscFeature': 'None'
 }
 
-t.replace_values.append(['Neighborhood', 'NAmes', 'NWAmes'])
-t.replace_values.append(['BldgType', '2fmCon', '2FmCon'])
-t.replace_values.append(['BldgType', 'Duplex', 'Duplx'])
-t.replace_values.append(['BldgType', 'Twnhs', 'TwnhsE'])
-t.replace_values.append(['Exterior2nd', 'Brk Cmn', 'BrkComm'])
-t.replace_values.append(['Exterior2nd', 'CmentBd', 'CemntBd'])
-t.replace_values.append(['Exterior2nd', 'Wd Shng', 'WdShing'])
+# NORMALIZE SOME FEATURES
 
-t.separate_out_value('PoolArea', 0, 'NoPool')
 t.logify_columns.append('SalePrice')  # +4%!
 t.logify_columns.extend(('LotArea', 'GrLivArea', '1stFlrSF'))  # +0.4%!
-t.fill_na_mean = False
+
+# REMOVE A FEW OULIERS
+
 t.remove_outliers.extend((524, 1299))  # +3%!
-t.dummify_at_init = True
-t.dummify_drop_first = False
-t.use_label_encoding = False
-#t.use_dummies_for_specific_columns = ['Neighborhood']
 
-
-use_runtime_dummies = False
+# hack
 
 mssc_cats = schema['columns']['MSSubClass']['categories']
 for c in mssc_cats:
     t.replace_values.append(['MSSubClass', int(c), c])
+
 
 def training():
     return t

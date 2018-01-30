@@ -81,6 +81,18 @@ class Training:
 
         self.transform_preferred_to_numerical()
 
+        # REMOVE COLS
+
+        if len(self.train_columns) > 0:
+            self.retain_columns(self.train_columns)
+
+        for col in self.drop_columns:
+            print 'Dropping', col
+            self.df_train = self.df_train.drop([col], axis=1)
+            self.df_test = self.df_test.drop([col], axis=1)
+
+        # CATEGORICALS
+
         if self.quantile_bins > 1:
             self.df_train, self.df_test = quantile_bin_all(
                 self.schema, self.quantile_bins, self.df_train, self.df_test)
@@ -98,14 +110,6 @@ class Training:
         print 'Prepared produced', self.df_train.shape[1], 'columns'
         print self.df_train.columns
         #self.fillna(-99999)
-
-        if len(self.train_columns) > 0:
-            self.retain_columns(self.train_columns)
-
-        for col in self.drop_columns:
-            print 'Dropping', col
-            self.df_train = self.df_train.drop([col], axis=1)
-            self.df_test = self.df_test.drop([col], axis=1)
 
         # SAFETY CHECK
         if self.diagnose_nas() > 0:

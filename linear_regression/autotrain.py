@@ -12,14 +12,17 @@ from utils.kaggle import *
 t = training()
 t.dummify_at_init = False
 t.drop_columns = ['Utilities']#,'MSSubClass']
+t.dummify_at_init = False
+t.dummify_drop_first = False
+t.use_label_encoding = False
 
 t.prepare()
 
-available_columns = list(t.df_train.columns.values)
-
+use_runtime_dummies = True
 n_passes = 10
-validated_columns = []
 
+available_columns = list(t.df_train.columns.values)
+validated_columns = []
 best_accuracy = 0
 making_progress = True
 df_testcols = pd.DataFrame(columns=['ColName', 'Accuracy'])
@@ -36,7 +39,8 @@ while (making_progress):
         #print 'retaining',test_columns
         #print 'got',df_train.columns
 
-        df_train, _ = t.do_dummify(df_train, None, False)
+        if use_runtime_dummies:
+            df_train, _ = t.do_dummify(df_train, None, False)
         #print df_train.columns
         #print df_train.head()
 
