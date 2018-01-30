@@ -16,6 +16,40 @@ scaler = StandardScaler()
 clf = LinearRegression()
 
 
+def dummify_col_with_schema(col, schema, df_train, df_test=None):
+    scol = schema['columns'][col]
+    if (scol['type'] == 'BINARY' or scol['type'] == 'CATEGORICAL'):
+        df_train[col] = df_train[col].astype(
+            'category', categories=scol['categories'])
+        if df_test is not None:
+            df_test[col] = df_test[col].astype(
+                'category', categories=scol['categories'])
+    elif (scol['type'] == 'NUMERIC'):
+        df_train[col] = df_train[col].astype('float64')
+        if df_test is not None:
+            if (col in df_test.columns):
+                df_test[col] = df_test[col].astype('float64')
+    else:
+        print 'ERROR coltype not supported', col, scol
+        sys.exit(1)
+
+    df_train = pd.get_dummies(
+        df_train, drop_first=dummify_drop_first, columns=[col])
+
+    if df_test is not None:
+        df_test = pd.get_dummies(
+            df_test, drop_first=dummify_drop_first, columns=[col])
+
+        if len(df_train.columns) != len(df_test.columns):
+            print df_train.columns
+            print df_test.columns
+            raise Exception(
+                'Dummifying produced a different number of columns for train and test!'
+            )
+
+    return df_train, df_test
+
+
 def dummify_with_schema(schema, df_train, df_test=None):
     for col in schema['columns']:
         if col in df_train.columns:
@@ -100,7 +134,8 @@ def test_accuracy(df_train, y, passes=1):
         #print accuracy
 
         if (accuracy > 10 or accuracy < -10):
-            pass
+            print 'acc off', accuracy
+            #pass
             #np.savetxt('expected.txt', y_test, fmt='%f')
             #np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
             #raise Exception('Accuracy is way off', accuracy)
@@ -155,6 +190,7 @@ def quantile_bin_all(schema, nbins, df_train, df_test):
             df_train, df_test = quantile_bin(df_train, df_test, col, nbins)
     return df_train, df_test
 
+
 def quantile_bin(df_train, df_test, col, nbins):
     # numeric to categorical
     df_train[col], bins = pd.qcut(
@@ -182,3 +218,16 @@ def separate_out_value(df, col, value, newcol):
 
     df[newcol] = df.apply(matchesZeroTransform, axis=1)
     df[col] = df.apply(otherwiseTransform, axis=1)
+
+
+def get_pandas_types(schema):
+    types = {}
+
+    for c in schema['columns']:
+        if schema['columns'][c]['type'] == 'NUMERIC':
+            types[c] = float
+        else:
+            types[c] = str
+
+    print types
+    return types

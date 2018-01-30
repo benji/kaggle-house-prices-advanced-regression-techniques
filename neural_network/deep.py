@@ -39,25 +39,63 @@ schema = json.loads(open('../schema2.json', 'r').read())
 
 #t.separate_out_value('PoolArea', 0, 'NoPool')
 
-outliers_LotArea = df_train['LotArea'][df_train['LotArea']>100000]
+outliers_LotArea = df_train['LotArea'][df_train['LotArea'] > 100000]
 df_train = df_train.drop(outliers_LotArea.index)
 
+#df_train['TotalSF'] = df_train['TotalBsmtSF'] + df_train['1stFlrSF'] + df_train['2ndFlrSF']
+#df_test['TotalSF'] = df_test['TotalBsmtSF'] + df_test['1stFlrSF'] + df_test['2ndFlrSF']
+
+
 t = Training(df_train, df_test, schema=schema)
+
+t.columns_na = {
+    'PoolQC':'None',
+    'Alley':'None',
+    'Fence':'None',
+    'FireplaceQu':'None',
+    'GarageType':'None',
+    'GarageFinish':'None',
+    'GarageQual':'None',
+    'GarageCond':'None',
+    'GarageYrBlt':0,
+    'GarageArea':0,
+    'GarageCars':0,
+    'BsmtQual':'None',
+    'BsmtCond':'None',
+    'BsmtExposure':'None',
+    'BsmtFinType1':'None',
+    'BsmtFinType2':'None',
+    'MasVnrType':'None',
+    'MasVnrArea':0,
+    'MSZoning':'RL',
+    'Functional':'Typ',
+    'Electrical':'SBrkr',
+    'KitchenQual':'TA',
+    'Exterior1st':'VinylSd',
+    'Exterior2nd':'VinylSd',
+    'SaleType':'WD',
+    'MSSubClass':'None',
+    'MiscFeature':'None'
+}
+
+t.to_numeric_columns = ['OverallQual']
+
 #t.logify_columns.append('SalePrice')
-t.logify_columns=['LotArea']
+t.logify_columns = ['LotArea']
 #, 'GrLivArea', '1stFlrSF'))
 #t.fill_na_mean = True
-t.fill_na_value = -99999
+#t.fill_na_value = -99999
 t.quantile_bins = 20
 t.remove_outliers.extend((524, 1299))
 t.dummify_at_init = True
-
 
 t.separate_out_value('BsmtFinSF1', 0, 'NoBsmt')
 t.separate_out_value('YearRemodAdd', np.nan, 'NoRemodAdd')
 t.separate_out_value('PoolArea', 0, 'NoPool')
 
 t.prepare()
+
+
 #t.df_train.to_csv('temp.csv')
 
 #t.df_train = pd.read_csv('../neural_network.bak/deep_train.csv', index_col=0)
@@ -87,7 +125,7 @@ model.summary()
 model.compile(loss='mean_squared_error', optimizer='rmsprop')
 
 history = model.fit(X_train, y_train, epochs=10, batch_size=128)
-print 'loss $$',np.sqrt(history.history['loss'][-1])
+print 'loss $$', np.sqrt(history.history['loss'][-1])
 
 if hm_manual_validation > 0:
     # custom validation
@@ -102,7 +140,6 @@ if hm_manual_validation > 0:
     diff_pred = prediction_val - valY
 
     print 'diff prediction $', np.mean(np.absolute(diff_pred))
-
 
 prediction = model.predict(t.df_test.values)
 

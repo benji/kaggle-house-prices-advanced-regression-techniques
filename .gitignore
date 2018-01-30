@@ -12,3 +12,6 @@ history.txt
 
 amazon_machine_learning/aml_recipe.json
 amazon_machine_learning/aml_schema.json
+
+.vscode
+neural_network.bak

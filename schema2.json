@@ -35,11 +35,11 @@
         "BsmtCond": {
             "categories": [
                 "NA",
-                "Fa",
-                "Gd",
-                "Ex",
                 "Po",
-                "TA"
+                "Fa",
+                "TA",
+                "Gd",
+                "Ex"
             ],
             "type": "CATEGORICAL"
         },
@@ -92,11 +92,11 @@
         "BsmtQual": {
             "categories": [
                 "NA",
-                "Fa",
-                "Gd",
-                "Ex",
                 "Po",
-                "TA"
+                "Fa",
+                "TA",
+                "Gd",
+                "Ex"
             ],
             "type": "CATEGORICAL"
         },
@@ -153,23 +153,25 @@
         },
         "ExterCond": {
             "categories": [
-                "Fa",
-                "Gd",
-                "Ex",
                 "Po",
-                "TA"
+                "Fa",
+                "TA",
+                "Gd",
+                "Ex"
             ],
-            "type": "CATEGORICAL"
+            "type": "CATEGORICAL",
+            "tonum": true
         },
         "ExterQual": {
             "categories": [
-                "Fa",
-                "Gd",
-                "Ex",
                 "Po",
-                "TA"
+                "Fa",
+                "TA",
+                "Gd",
+                "Ex"
             ],
-            "type": "CATEGORICAL"
+            "type": "CATEGORICAL",
+            "tonum": true
         },
         "Exterior1st": {
             "categories": [
@@ -228,11 +230,11 @@
         "FireplaceQu": {
             "categories": [
                 "NA",
-                "Fa",
-                "Gd",
-                "Ex",
                 "Po",
-                "TA"
+                "Fa",
+                "TA",
+                "Gd",
+                "Ex"
             ],
             "type": "CATEGORICAL"
         },
@@ -275,11 +277,11 @@
         "GarageCond": {
             "categories": [
                 "NA",
-                "Fa",
-                "Gd",
-                "Ex",
                 "Po",
-                "TA"
+                "Fa",
+                "TA",
+                "Gd",
+                "Ex"
             ],
             "type": "CATEGORICAL"
         },
@@ -295,11 +297,11 @@
         "GarageQual": {
             "categories": [
                 "NA",
-                "Fa",
-                "Gd",
-                "Ex",
                 "Po",
-                "TA"
+                "Fa",
+                "TA",
+                "Gd",
+                "Ex"
             ],
             "type": "CATEGORICAL"
         },
@@ -337,13 +339,14 @@
         },
         "HeatingQC": {
             "categories": [
-                "Fa",
-                "Gd",
-                "Ex",
                 "Po",
-                "TA"
+                "Fa",
+                "TA",
+                "Gd",
+                "Ex"
             ],
-            "type": "CATEGORICAL"
+            "type": "CATEGORICAL",
+            "tonum": true
         },
         "HouseStyle": {
             "categories": [
@@ -363,13 +366,14 @@
         },
         "KitchenQual": {
             "categories": [
-                "Fa",
-                "Gd",
-                "Ex",
                 "Po",
-                "TA"
+                "Fa",
+                "TA",
+                "Gd",
+                "Ex"
             ],
-            "type": "CATEGORICAL"
+            "type": "CATEGORICAL",
+            "tonum": true
         },
         "LandContour": {
             "categories": [
@@ -386,7 +390,8 @@
                 "Gtl",
                 "Mod"
             ],
-            "type": "CATEGORICAL"
+            "type": "CATEGORICAL",
+            "tonum": true
         },
         "LotArea": {
             "type": "NUMERIC"
@@ -446,7 +451,8 @@
                 "RH",
                 "RL",
                 "RP",
-                "RM"
+                "RM",
+                "C (all)"
             ],
             "type": "CATEGORICAL"
         },
@@ -529,7 +535,8 @@
                 "9",
                 "10"
             ],
-            "type": "CATEGORICAL"
+            "type": "CATEGORICAL",
+            "tonum": true
         },
         "OverallQual": {
             "categories": [
@@ -544,7 +551,8 @@
                 "9",
                 "10"
             ],
-            "type": "CATEGORICAL"
+            "type": "CATEGORICAL",
+            "tonum": true
         },
         "PavedDrive": {
             "categories": [
@@ -559,13 +567,14 @@
         },
         "PoolQC": {
             "categories": [
-                "Ex",
-                "Gd",
-                "TA",
+                "Po",
                 "Fa",
-                "NA"
+                "TA",
+                "Gd",
+                "Ex"
             ],
-            "type": "CATEGORICAL"
+            "type": "CATEGORICAL",
+            "tonum": true
         },
         "RoofMatl": {
             "categories": [
