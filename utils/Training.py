@@ -37,8 +37,20 @@ class Training:
         self.idcol = self.schema['id']
         self.targetcol = self.schema['target']
 
-        # MISSING VALUES
-        self.fillna_columns_user_strategy()
+        for c in self.df_train.columns:
+            if c != self.idcol and c != self.targetcol and not c in self.schema['columns']:
+                raise Exception('Column', c, 'not defined in schema.')
+
+        # EXCLUDE ROWS
+
+        for o in self.remove_outliers:
+            self.remove_outlier(o)
+
+        # MODIFY VALUES
+
+        self.do_replace_values()
+
+        self.fillna_per_column()
 
         if self.fill_na_value is not None:
             self.fillna(self.fill_na_value)
@@ -46,30 +58,16 @@ class Training:
         if self.fill_na_mean is not None:
             self._fill_na_mean()
 
-        # REMOVE COLS WITH UNIQUE DATA
-        self.remove_columns_with_unique_value()
-
-        # REMOVE ROWS
-        for o in self.remove_outliers:
-            self.remove_outlier(o)
-
-        # TRANSFORM VALUES
-        self.df_train[self.targetcol] = self.df_train[self.targetcol].astype(
-            'float64')
-
-        self.do_replace_values()
-
         for c in self.logify_columns:
             self.logify(c)
 
-        self.transform_to_numeric_columns()
+        # EXCLUDE COLUMNS
 
-        # SAVE IDS & LABELS
+        self.remove_columns_with_unique_value()
+
         self.test_ids = self.df_test[self.idcol]
-
         self.labels = self.df_train[self.targetcol]
 
-        # REMOVE COLUMNS
         self.df_train.drop(self.targetcol, 1, inplace=True)
 
         if (self.idcol in self.df_train.columns):
@@ -77,18 +75,9 @@ class Training:
             if self.df_test is not None:
                 self.df_test.drop(self.idcol, 1, inplace=True)
 
-        for col in self.drop_columns:
-            print 'Dropping', col
-            self.df_train = self.df_train.drop([col], axis=1)
-            self.df_test = self.df_test.drop([col], axis=1)
-
-        # SAFETY CHECK
-        if self.diagnose_nas() > 0:
-            raise Exception('Found NAs in data')
-
         # TRANSFORM COLUMNS
-        if len(self.train_columns) > 0:
-            self.retain_columns(self.train_columns)
+
+        self.transform_to_numeric_columns()
 
         self.transform_preferred_to_numerical()
 
@@ -100,7 +89,8 @@ class Training:
                     'You need to use dummies of you use quantile_bin')
 
         if self.dummify_at_init:
-            self.df_train, self.df_test = self.do_dummify(True)
+            self.df_train, self.df_test = self.do_dummify(
+                self.df_train, self.df_test, True)
 
         self.do_label_encoding()
 
@@ -109,7 +99,23 @@ class Training:
         print self.df_train.columns
         #self.fillna(-99999)
 
+        if len(self.train_columns) > 0:
+            self.retain_columns(self.train_columns)
+
+        for col in self.drop_columns:
+            print 'Dropping', col
+            self.df_train = self.df_train.drop([col], axis=1)
+            self.df_test = self.df_test.drop([col], axis=1)
+
+        # SAFETY CHECK
+        if self.diagnose_nas() > 0:
+            raise Exception('Found NAs in data')
+
+
     def should_dummify_col(self, c):
+        if self.schema['columns'][c]['type'] == 'NUMERIC':
+            return False
+
         if len(self.use_dummies_for_specific_columns) == 0:
             return True
 
@@ -118,8 +124,7 @@ class Training:
 
         return False
 
-    def do_dummify(self, verbose=False):
-        train, test = self.df_train.copy(), self.df_test.copy()
+    def do_dummify(self, train, test=None, verbose=False):
         for c in train.columns:
             if self.should_dummify_col(c):
                 if verbose:
@@ -168,6 +173,7 @@ class Training:
         self.df_train.drop(idx, inplace=True)
 
     def logify(self, col):
+        print 'Logifying column', col
         self.df_train[col] = np.log(self.df_train[col])
         if self.df_test is not None and col in self.df_test.columns:
             self.df_test[col] = np.log(self.df_test[col])
@@ -192,11 +198,12 @@ class Training:
         for df in [self.df_train, self.df_test]:
             if df is not None:
                 df[newcol] = df.apply(matchesZeroTransform, axis=1)
+                self.schema['columns'][newcol] = {'type': 'NUMERIC'}
                 #df[col] = df.apply(otherwiseTransform, axis=1)
 
         self.schema[newcol] = {"categories": [0, 1], "type": "CATEGORICAL"}
 
-    def fillna_columns_user_strategy(self):
+    def fillna_per_column(self):
         for c in self.columns_na:
             v = self.columns_na[c]
             print 'filling NAs in column', c, 'to', v
@@ -250,6 +257,8 @@ class Training:
                 self.df_train[col] = self.df_train[col].astype('float64')
                 self.df_test[col] = self.df_test[col].astype('float64')
 
+                self.schema['columns'][col] = {'type': 'NUMERIC'}
+
     def do_replace_values(self):
         for rv in self.replace_values:
             col = rv[0]
@@ -282,3 +291,10 @@ class Training:
                 lbl.fit(cats)
                 self.df_train[c] = lbl.transform(self.df_train[c].values)
                 self.df_test[c] = lbl.transform(self.df_test[c].values)
+
+                if self.df_train[c].nunique() == 1:
+                    raise Exception('Label encoding of column', c,
+                                    'has only 1 value',
+                                    self.df_train[c].iloc[0])
+
+                self.schema['columns'][c] = {'type': 'NUMERIC'}

@@ -17,10 +17,17 @@ clf = LinearRegression()
 
 
 def dummify_col_with_schema(col, schema, df_train, df_test=None):
+    if df_test is not None:
+        if len(df_train.columns) != len(df_test.columns):
+            raise Exception(
+                'Coming with different number of columns for train and test!')
+
     scol = schema['columns'][col]
     if (scol['type'] == 'BINARY' or scol['type'] == 'CATEGORICAL'):
+        #print df_train[col].head()
         df_train[col] = df_train[col].astype(
             'category', categories=scol['categories'])
+        #print df_train[col].head()
         if df_test is not None:
             df_test[col] = df_test[col].astype(
                 'category', categories=scol['categories'])
@@ -33,12 +40,34 @@ def dummify_col_with_schema(col, schema, df_train, df_test=None):
         print 'ERROR coltype not supported', col, scol
         sys.exit(1)
 
-    df_train = pd.get_dummies(
+    df_train2 = pd.get_dummies(
         df_train, drop_first=dummify_drop_first, columns=[col])
+
+    newcolumns = set(df_train2.columns) - set(df_train.columns)
+    #print 'New dummy columns:', newcolumns
+    df_train = df_train2
+
+    meaningful_columns = []
+    meaningless_columns = []
+
+    for nc in newcolumns:
+        if df_train2[nc].nunique() == 1:
+            #print 'Dummy column', nc, 'has only 1 value', df_train2[nc].iloc[0]
+            df_train2.drop(nc, 1, inplace=True)
+            meaningless_columns.append(nc)
+        else:
+            meaningful_columns.append(nc)
+
+    if len(meaningful_columns) == 0:
+        raise Exception('Dumification of column', col,
+                        'resulted in no meaningful columns.')
 
     if df_test is not None:
         df_test = pd.get_dummies(
             df_test, drop_first=dummify_drop_first, columns=[col])
+
+        for mnlc in meaningless_columns:
+            df_test.drop(mnlc, 1, inplace=True)
 
         if len(df_train.columns) != len(df_test.columns):
             print df_train.columns
@@ -133,7 +162,47 @@ def test_accuracy(df_train, y, passes=1):
         accuracy = clf.score(X_test, y_test)
         #print accuracy
 
-        if (accuracy > 10 or accuracy < -10):
+        if False:  #(accuracy > 10 or accuracy < -10):
+            print 'acc off', accuracy
+            #pass
+            #np.savetxt('expected.txt', y_test, fmt='%f')
+            #np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
+            #raise Exception('Accuracy is way off', accuracy)
+        else:
+            accuracies.append(accuracy)
+
+    return np.mean(accuracies)
+
+
+def test_accuracy_debug(df_train, y, passes=1):
+
+    scaler.fit(df_train)
+    X = np.array(df_train)
+    X = scaler.transform(X)
+
+    cut = -400
+
+    X_train = X[:cut]
+    X_test = X[cut:]
+
+    y_train = y[:cut].values
+    y_test = y[cut:].values
+
+    accuracies = []
+
+    for _ in range(passes):
+        #X_train, X_test, y_train, y_test = cross_validation.train_test_split(
+        #    X, y, test_size=0.3)
+
+        clf.fit(X_train, y_train)
+        accuracy = clf.score(X_test, y_test)
+        #print accuracy
+
+        np.savetxt('test.txt', X_test, fmt='%f')
+        np.savetxt('expected.txt', y_test, fmt='%f')
+        np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
+
+        if False:  #(accuracy > 10 or accuracy < -10):
             print 'acc off', accuracy
             #pass
             #np.savetxt('expected.txt', y_test, fmt='%f')
