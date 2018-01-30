@@ -19,8 +19,10 @@ t.use_label_encoding = False
 
 t.prepare()
 
-accuracy = test_accuracy(t.df_train, t.labels, passes=100) * 100
-print 'Accuracy', accuracy
+t.sanity()
+
+accuracy = test_accuracy_kfolds(t.df_train, t.labels)
+print 'Coefficient of determination:', accuracy
 
 generate_predictions(t.labels, t.df_train, t.df_test, t.test_ids)
 print "Predictions complete."

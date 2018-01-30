@@ -11,7 +11,6 @@ from utils.kaggle import *
 
 t = training()
 t.dummify_at_init = False
-t.drop_columns = ['Utilities']#,'MSSubClass']
 t.dummify_at_init = False
 t.dummify_drop_first = False
 t.use_label_encoding = False
@@ -44,7 +43,8 @@ while (making_progress):
         #print df_train.columns
         #print df_train.head()
 
-        accuracy = test_accuracy(df_train, t.labels, passes=n_passes) * 100
+        #accuracy = test_accuracy(df_train, t.labels, passes=n_passes) * 100
+        accuracy = test_accuracy_kfolds(df_train, t.labels)
 
         #print 'Accuracy for column', test_column, ':', accuracy
         df_testcols.loc[len(df_testcols)] = [test_column, accuracy]
@@ -58,7 +58,7 @@ while (making_progress):
     best_column = ranked_test_columns.iloc[0, 0]
 
     diff_accuracy = max_accuracy - best_accuracy
-    print 'Found best column', best_column, 'with accuracy', max_accuracy, '(diff=', diff_accuracy, '%)'
+    print 'Found best column', best_column, 'with accuracy', max_accuracy, '(diff=', diff_accuracy, ')'
 
     if (diff_accuracy > 0):
         best_accuracy = max_accuracy
@@ -73,7 +73,10 @@ print 'Final accuracy', best_accuracy
 
 t.retain_columns(validated_columns)
 
-df_train, df_test = dummify_with_schema(t.schema, t.df_train, t.df_test)
+if use_runtime_dummies:
+    df_train, df_test = t.do_dummify(t.df_train, t.df_test, False)
+else:
+    df_train, df_test = t.df_train, t.df_test
 
 generate_predictions(t.labels, df_train, df_test, t.test_ids)
 print "Predictions complete."
