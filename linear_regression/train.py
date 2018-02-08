@@ -2,27 +2,55 @@ import math, json, sys, os
 import pandas as pd
 from os import path
 
+from sklearn.linear_model import LinearRegression, ElasticNet, Lasso, BayesianRidge, LassoLarsIC, Ridge
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import RobustScaler
+from sklearn.kernel_ridge import KernelRidge
+from sklearn.model_selection import KFold, cross_val_score, train_test_split
+
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 from utils.utils import *
 from utils.kaggle import *
 from utils.Training import *
 
 t = training()
-t.train_columns = [
-    'TotalSF', 'OverallQual', 'YearBuilt', 'OverallCond', 'LotArea',
-    'BsmtFullBath', 'TotalBsmtSF', 'MoSold'
-]
 
 t.dummify_at_init = True
 t.dummify_drop_first = False
 t.use_label_encoding = False
 
+t.train_columns = [
+    'OverallQual', 'TotalSF', 'Neighborhood', 'OverallCond', 'BsmtQual',
+    'MSSubClass', 'GarageArea', 'BsmtUnfSF', 'YearBuilt', 'LotArea',
+    'MSZoning', 'Fireplaces', 'Functional', 'HeatingQC', 'SaleCondition',
+    'Condition1', 'BsmtExposure', 'GrLivArea', 'BsmtFinType1', 'KitchenQual',
+    'BsmtFinSF1', 'Exterior1st', '2ndFlrSF', 'GarageCars', 'ScreenPorch',
+    'WoodDeckSF', 'BsmtFullBath', 'CentralAir', '1stFlrSF', 'HalfBath',
+    'PoolArea', 'GarageYrBlt', 'MasVnrType', 'ExterQual', 'KitchenAbvGr',
+    'FullBath', 'LotConfig', 'Foundation', 'LowQualFinSF', 'BedroomAbvGr',
+    'BsmtFinSF2', 'Condition2', 'PoolQC'
+]
+
 t.prepare()
 
-t.sanity()
+#t.sanity()
+t.save('tmp')
 
-accuracy = test_accuracy_kfolds(t.df_train, t.labels)
+#t.df_train, t.df_test = t.do_dummify(t.df_train, t.df_test, False)
+
+model0 = Lasso(alpha=0.0005, random_state=1)
+model = make_pipeline(RobustScaler(), model0)
+
+accuracy = test_accuracy_for_model_using_kfolds(
+    model, t.df_train, t.labels, scale=False)
 print 'Coefficient of determination:', accuracy
 
-generate_predictions(t.labels, t.df_train, t.df_test, t.test_ids)
-print "Predictions complete."
+print 'RMSE', test_accuracy_rmsle(model, t.df_train, t.labels)
+
+df_predicted = pd.DataFrame(columns=['Id', 'SalePrice'])
+df_predicted['Id'] = t.test_ids
+df_predicted.set_index('Id')
+df_predicted['SalePrice'] = np.exp(model.predict(t.df_test))
+df_predicted.to_csv('predicted.csv', sep=',', index=False)
+
+print 'predictions done.'

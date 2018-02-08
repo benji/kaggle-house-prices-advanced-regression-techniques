@@ -1,37 +1,38 @@
 import pandas as pd
 import numpy as np
-import sys
+import sys, os
 from sklearn.preprocessing import LabelEncoder
 
 from utils import *
 
 
 class Training:
-    logify_columns = []
-    fill_na_value = None
-    fill_na_mean = None
-    remove_outliers = []
-    dummify_at_init = False
-    dummify_drop_first = True
-    train_columns = []
-    dummy_na = False
-    quantile_bins = 1
-    columns_na = {}
-    to_numeric_columns = []
-    drop_columns = []
-    prefer_numerical = False
-    use_label_encoding = False
-    replace_values = []
-    use_dummies_for_specific_columns = []
-
-    # will be filled by prepare()
-    labels = None
-    test_ids = None
-
     def __init__(self, df_train, df_test=None, schema=None):
         self.df_train = df_train
         self.df_test = df_test
         self.schema = schema
+        self.logify_columns = []
+        self.fill_na_value = None
+        self.fill_na_mean = None
+        self.remove_outliers = []
+        self.dummify_at_init = False
+        self.dummify_drop_first = True
+        self.train_columns = []
+        self.dummy_na = False
+        self.quantile_bins = 1
+        self.columns_na = {}
+        self.to_numeric_columns = []
+        self.drop_columns = []
+        self.prefer_numerical = False
+        self.use_label_encoding = False
+        self.replace_values = []
+        self.use_dummies_for_specific_columns = []
+        self.numerical_singularities_columns = []
+        self.enable_transform_preferred_to_numerical = True
+
+        # will be filled by prepare()
+        self.labels = None
+        self.test_ids = None
 
     def prepare(self):
         self.idcol = self.schema['id']
@@ -46,6 +47,16 @@ class Training:
         for o in self.remove_outliers:
             self.remove_outlier(o)
 
+        # IDS
+
+        self.test_ids = self.df_test[self.idcol]
+        self.train_ids = self.df_train[self.idcol]
+
+        if (self.idcol in self.df_train.columns):
+            self.df_train.drop(self.idcol, 1, inplace=True)
+            if self.df_test is not None:
+                self.df_test.drop(self.idcol, 1, inplace=True)
+
         # MODIFY VALUES
 
         self.do_replace_values()
@@ -58,28 +69,30 @@ class Training:
         if self.fill_na_mean is not None:
             self._fill_na_mean()
 
+        self.categoricals_as_string()
+
         for c in self.logify_columns:
             self.logify(c)
 
-        # EXCLUDE COLUMNS
+        # LABELS
 
-        self.remove_columns_with_unique_value()
-
-        self.test_ids = self.df_test[self.idcol]
         self.labels = self.df_train[self.targetcol]
 
         self.df_train.drop(self.targetcol, 1, inplace=True)
 
-        if (self.idcol in self.df_train.columns):
-            self.df_train.drop(self.idcol, 1, inplace=True)
-            if self.df_test is not None:
-                self.df_test.drop(self.idcol, 1, inplace=True)
+        # CLEANUP UNIQUE VALUE COLS
+
+        self.remove_columns_with_unique_value()
 
         # TRANSFORM COLUMNS
 
         self.transform_to_numeric_columns()
 
-        self.transform_preferred_to_numerical()
+        if self.enable_transform_preferred_to_numerical:
+            self.transform_preferred_to_numerical()
+
+        for c in self.numerical_singularities_columns:
+            self.numerical_singularities(c, 0)
 
         # REMOVE COLS
 
@@ -87,9 +100,7 @@ class Training:
             self.retain_columns(self.train_columns)
 
         for col in self.drop_columns:
-            print 'Dropping', col
-            self.df_train = self.df_train.drop([col], axis=1)
-            self.df_test = self.df_test.drop([col], axis=1)
+            self.do_drop_column(col)
 
         # CATEGORICALS
 
@@ -106,7 +117,7 @@ class Training:
 
         self.do_label_encoding()
 
-        self.df_train.to_csv('tmp.csv')
+        #self.df_train.to_csv('tmp.csv')
         print 'Prepared produced', self.df_train.shape[1], 'columns'
         print self.df_train.columns
         #self.fillna(-99999)
@@ -115,6 +126,25 @@ class Training:
         if self.diagnose_nas() > 0:
             raise Exception('Found NAs in data')
 
+    def get_columns_with_types(self, types):
+        cols = []
+        for col in self.df_train.columns:
+            if col != self.schema['target'] and col != self.schema['id'] and self.schema['columns'][col]['type'] in types:
+                cols.append(col)
+
+        return cols
+
+    def categorical_columns(self):
+        return self.get_columns_with_types(['CATEGORICAL', 'BINARY'])
+
+    def numerical_columns(self):
+        return self.get_columns_with_types(['NUMERIC'])
+
+    def categoricals_as_string(self):
+        for col in self.categorical_columns():
+            print 'as string', col
+            self.df_train[col] = self.df_train[col].astype(str)
+            self.df_test[col] = self.df_test[col].astype(str)
 
     def should_dummify_col(self, c):
         if self.schema['columns'][c]['type'] == 'NUMERIC':
@@ -152,7 +182,7 @@ class Training:
         if coldata['type'] == 'NUMERIC':
             return False
 
-        if 'tonum' in coldata and coldata['tonum'] == True:
+        if self.enable_transform_preferred_to_numerical and 'tonum' in coldata and coldata['tonum'] == True:
             return False
 
         return True
@@ -178,9 +208,9 @@ class Training:
 
     def logify(self, col):
         print 'Logifying column', col
-        self.df_train[col] = np.log(self.df_train[col])
+        self.df_train[col] = np.log1p(self.df_train[col])
         if self.df_test is not None and col in self.df_test.columns:
-            self.df_test[col] = np.log(self.df_test[col])
+            self.df_test[col] = np.log1p(self.df_test[col])
 
     def fillna(self, val):
         self.df_train.fillna(val, inplace=True)
@@ -192,6 +222,9 @@ class Training:
         will create a column with value 1 if this col is == value, 0 otherwise
         matching rows will be set to np.nan in former column
         '''
+
+        if not col in self.df_train.columns:
+            return
 
         def matchesZeroTransform(row):
             return 1 if row[col] == value else 0
@@ -269,6 +302,9 @@ class Training:
             self.df_train[col][self.df_train[col] == rv[1]] = rv[2]
             self.df_test[col][self.df_test[col] == rv[1]] = rv[2]
 
+            if self.df_train[self.df_train[col] == rv[1]].shape[0] > 0:
+                raise Exception('Failed to replace values')
+
     def remove_columns_with_unique_value(self):
         cols_before = self.df_train.columns
         self.df_train = self.df_train.loc[:, (
@@ -279,7 +315,8 @@ class Training:
 
         if len(cols_removed) > 0:
             print 'Removed constant columns', cols_removed
-            self.df_test = self.df_test[cols_after]
+            cols_tokeep = set(cols_after) - set([self.targetcol])
+            self.df_test = self.df_test[list(cols_tokeep)]
 
     def do_label_encoding(self):
         for c in self.df_train.columns:
@@ -301,4 +338,80 @@ class Training:
                                     'has only 1 value',
                                     self.df_train[c].iloc[0])
 
+                print 'do_label_encoding - changing type to NUMERIC', c
                 self.schema['columns'][c] = {'type': 'NUMERIC'}
+
+    def sanity(self, throw=True):
+        for df in [self.df_train, self.df_test]:
+            print 'check'
+            for c in df.columns:
+                tmp = df[c][df[c] > 100000]
+                if tmp.shape[0] > 0:
+                    print tmp.head()
+                    if throw:
+                        raise Exception('Found bad value')
+                    else:
+                        return False
+                tmp = df[c][df[c] < -100000]
+                if tmp.shape[0] > 0:
+                    print tmp.head()
+                    if throw:
+                        raise Exception('Found bad value')
+                    else:
+                        return False
+                tmp = df[c][df[c].isnull()]
+                if tmp.shape[0] > 0:
+                    print tmp.head()
+                    if throw:
+                        raise Exception('Found bad value')
+                    else:
+                        return False
+
+        print 'check'
+        tmp = self.labels[self.labels.isnull()]
+        if tmp.shape[0] > 0:
+            print tmp.head()
+            if throw:
+                raise Exception('Found bad value in y')
+            else:
+                return False
+
+        return True
+
+    def do_drop_column(self, col):
+        if col in self.df_train.columns:
+            print 'Dropping', col
+            self.df_train = self.df_train.drop([col], axis=1)
+            self.df_test = self.df_test.drop([col], axis=1)
+
+    def numerical_singularities(self, col, val):
+        print 'Extracting singular value', val, 'from', col
+
+        nonval = self.df_train[self.df_train[col] != val][col]
+
+        # get best fit line for non zero elements
+        z = np.polyfit(nonval, self.labels[nonval.index], 1)
+
+        # where should the zero elements be to keep that line?
+        vals = self.df_train[self.df_train[col] == val]
+        avg0 = self.labels[vals.index].mean()
+        x = (avg0 - z[1]) / z[0]
+
+        self.df_train[col][self.df_train[col] == val] = x
+        self.df_test[col][self.df_test[col] == val] = x
+
+    def save(self, folder):
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
+        train = self.df_train.copy()
+        train[self.idcol] = self.train_ids
+        train[self.targetcol] = self.labels
+        train.to_csv(folder + '/train.csv', index=False)
+
+        test = self.df_test.copy()
+        test[self.idcol] = self.test_ids
+        test.to_csv(folder + '/test.csv', index=False)
+
+        with open(folder + '/schema.json', 'w') as outfile:
+            json.dump(self.schema, outfile, indent=4)

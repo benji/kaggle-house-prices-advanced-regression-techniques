@@ -18,83 +18,26 @@ from sklearn.utils import shuffle
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 from utils.utils import *
 from utils.Training import *
+from utils.kaggle import *
+from deep_models import *
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
 use_log_label = False
 hm_manual_validation = 130
 
-df_train = pd.read_csv('../data/train.csv')
-df_test = pd.read_csv('../data/test.csv')
-
-schema = json.loads(open('../schema2.json', 'r').read())
-
-# special prep
-#df_train['DateSold'] = df_train['YrSold'] + df_train['MoSold'] / 12.0
-#df_test['DateSold'] = df_test['YrSold'] + df_test['MoSold'] / 12.0
-
-#outliers_LotArea = df_train['LotArea'][df_train['LotArea'] > 100000]
-#print outliers_LotArea
-#df_train = df_train.drop(outliers_LotArea.index)
-
-#t.separate_out_value('PoolArea', 0, 'NoPool')
-
-outliers_LotArea = df_train['LotArea'][df_train['LotArea'] > 100000]
-df_train = df_train.drop(outliers_LotArea.index)
-
-#df_train['TotalSF'] = df_train['TotalBsmtSF'] + df_train['1stFlrSF'] + df_train['2ndFlrSF']
-#df_test['TotalSF'] = df_test['TotalBsmtSF'] + df_test['1stFlrSF'] + df_test['2ndFlrSF']
-
+df_train = pd.read_csv('../categorical_to_numerical/newtrain.csv', index_col=0)
+df_test = pd.read_csv('../categorical_to_numerical/newtest.csv', index_col=0)
+schema = json.loads(
+    open('../categorical_to_numerical/newschema.json', 'r').read())
 
 t = Training(df_train, df_test, schema=schema)
 
-t.columns_na = {
-    'PoolQC':'None',
-    'Alley':'None',
-    'Fence':'None',
-    'FireplaceQu':'None',
-    'GarageType':'None',
-    'GarageFinish':'None',
-    'GarageQual':'None',
-    'GarageCond':'None',
-    'GarageYrBlt':0,
-    'GarageArea':0,
-    'GarageCars':0,
-    'BsmtQual':'None',
-    'BsmtCond':'None',
-    'BsmtExposure':'None',
-    'BsmtFinType1':'None',
-    'BsmtFinType2':'None',
-    'MasVnrType':'None',
-    'MasVnrArea':0,
-    'MSZoning':'RL',
-    'Functional':'Typ',
-    'Electrical':'SBrkr',
-    'KitchenQual':'TA',
-    'Exterior1st':'VinylSd',
-    'Exterior2nd':'VinylSd',
-    'SaleType':'WD',
-    'MSSubClass':'None',
-    'MiscFeature':'None'
-}
-
-t.to_numeric_columns = ['OverallQual']
-
-#t.logify_columns.append('SalePrice')
-t.logify_columns = ['LotArea']
-#, 'GrLivArea', '1stFlrSF'))
-#t.fill_na_mean = True
-#t.fill_na_value = -99999
-t.quantile_bins = 20
-t.remove_outliers.extend((524, 1299))
 t.dummify_at_init = True
-
-t.separate_out_value('BsmtFinSF1', 0, 'NoBsmt')
-t.separate_out_value('YearRemodAdd', np.nan, 'NoRemodAdd')
-t.separate_out_value('PoolArea', 0, 'NoPool')
-
+t.dummify_drop_first = False
+t.use_label_encoding = False
 t.prepare()
-
+t.labels = np.exp(t.labels)
 
 #t.df_train.to_csv('temp.csv')
 
@@ -113,40 +56,42 @@ if hm_manual_validation > 0:
     X_train = X_train[:-hm_manual_validation]
     y_train = y_train[:-hm_manual_validation]
 
-model = Sequential()
-model.add(Dense(ncols, input_dim=ncols, activation='linear'))
-model.add(Dense(ncols, activation='linear'))
-model.add(Dense(ncols, activation='linear'))
-model.add(Dense(ncols, activation='linear'))
-model.add(Dense(1))
+modelFn = model1
+epochs = 150
 
-model.summary()
+#modelFn=model2
+#epochs = 30
 
-model.compile(loss='mean_squared_error', optimizer='rmsprop')
 
-history = model.fit(X_train, y_train, epochs=10, batch_size=128)
-print 'loss $$', np.sqrt(history.history['loss'][-1])
+def build_model():
+    return modelFn(ncols)
 
-if hm_manual_validation > 0:
-    # custom validation
-    valX = X[-hm_manual_validation:]
-    valY = y[-hm_manual_validation:]
 
-    prediction_val = model.predict(valX)
-    if use_log_label:
-        prediction_val = np.exp(prediction_val)
-        valY = np.exp(valY)
+#acc = keras_deep_test_accuracy_for_model_using_kfolds(
+#    build_model, t.df_train, t.labels, n_splits=4,epochs=epochs)
+#print 'Cross validation R2:', acc
 
-    diff_pred = prediction_val - valY
+estimator = KerasRegressor(
+    build_fn=build_model, nb_epoch=epochs, batch_size=128, verbose=True)
 
-    print 'diff prediction $', np.mean(np.absolute(diff_pred))
+def test_accuracy_rmsle2(model, train, y, n_folds=5):
+    kf = KFold(
+        n_folds, shuffle=True, random_state=42).get_n_splits(train.values)
+    score = np.sqrt(-cross_val_score(model, train.values, y.values, cv=kf))
+    return score.mean()
 
-prediction = model.predict(t.df_test.values)
 
-df_predicted = pd.DataFrame(columns=['Id', 'SalePrice'])
-df_predicted['Id'] = t.test_ids
-df_predicted.set_index('Id')
-df_predicted['SalePrice'] = prediction
-df_predicted.to_csv('predicted.csv', sep=',', index=False)
+print 'RMSE', test_accuracy_rmsle2(estimator, t.df_train, t.labels)
 
-print 'Predictions done.'
+
+if False:
+    model=None
+    prediction = model.predict(t.df_test.values)
+
+    df_predicted = pd.DataFrame(columns=['Id', 'SalePrice'])
+    df_predicted['Id'] = t.test_ids
+    df_predicted.set_index('Id')
+    df_predicted['SalePrice'] = np.exp(prediction)
+    df_predicted.to_csv('predicted.csv', sep=',', index=False)
+
+    print 'Predictions done.'   

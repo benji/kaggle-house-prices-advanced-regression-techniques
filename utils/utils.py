@@ -5,6 +5,9 @@ from sklearn import preprocessing, cross_validation, svm
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import shuffle
+from sklearn.model_selection import KFold, cross_val_score, train_test_split
+from sklearn.utils import shuffle
+from sklearn.metrics import r2_score
 
 pd.options.mode.chained_assignment = None  # default='warn'
 import warnings
@@ -17,6 +20,9 @@ clf = LinearRegression()
 
 
 def dummify_col_with_schema(col, schema, df_train, df_test=None):
+    if not col in df_train.columns:
+        raise Exception('Could\'t find column', col, ' in training dataset')
+
     if df_test is not None:
         if len(df_train.columns) != len(df_test.columns):
             raise Exception(
@@ -24,18 +30,20 @@ def dummify_col_with_schema(col, schema, df_train, df_test=None):
 
     scol = schema['columns'][col]
     if (scol['type'] == 'BINARY' or scol['type'] == 'CATEGORICAL'):
-        #print df_train[col].head()
+        # now conversion to categorical strings should work
         df_train[col] = df_train[col].astype(
             'category', categories=scol['categories'])
-        #print df_train[col].head()
+        
         if df_test is not None:
             df_test[col] = df_test[col].astype(
                 'category', categories=scol['categories'])
+
     elif (scol['type'] == 'NUMERIC'):
         df_train[col] = df_train[col].astype('float64')
         if df_test is not None:
             if (col in df_test.columns):
                 df_test[col] = df_test[col].astype('float64')
+
     else:
         print 'ERROR coltype not supported', col, scol
         sys.exit(1)
@@ -45,22 +53,25 @@ def dummify_col_with_schema(col, schema, df_train, df_test=None):
 
     newcolumns = set(df_train2.columns) - set(df_train.columns)
     #print 'New dummy columns:', newcolumns
-    df_train = df_train2
 
     meaningful_columns = []
     meaningless_columns = []
 
     for nc in newcolumns:
         if df_train2[nc].nunique() == 1:
-            #print 'Dummy column', nc, 'has only 1 value', df_train2[nc].iloc[0],', removing it.'
+            #print 'Dummy column', nc, 'has only 1 value', df_train2[nc].iloc[
+            #    0], ', removing it.'
             df_train2.drop(nc, 1, inplace=True)
             meaningless_columns.append(nc)
         else:
             meaningful_columns.append(nc)
 
     if len(meaningful_columns) == 0:
+        print df_train[col].head()
         raise Exception('Dumification of column', col,
-                        'resulted in no meaningful columns.')
+                        'resulted in no meaningful columns')
+
+    df_train = df_train2
 
     if df_test is not None:
         df_test = pd.get_dummies(
@@ -162,7 +173,7 @@ def test_accuracy(df_train, y, passes=1):
         accuracy = clf.score(X_test, y_test)
         #print accuracy
 
-        if False:#(accuracy > 10 or accuracy < -10):
+        if False:  #(accuracy > 10 or accuracy < -10):
             print 'acc off', accuracy
             #pass
             #df_train.to_csv('train.csv')
@@ -173,6 +184,108 @@ def test_accuracy(df_train, y, passes=1):
             accuracies.append(accuracy)
 
     return np.mean(accuracies)
+
+
+def test_accuracy_kfolds(df_train, y, n_splits=4):
+    return test_accuracy_for_model_using_kfolds(clf, df_train, y, n_splits)
+
+
+def test_accuracy_for_model_using_kfolds(model,
+                                         df_train,
+                                         y,
+                                         n_splits=4,
+                                         scale=True):
+    X = np.array(df_train)
+
+    if scale:
+        scaler.fit(df_train)
+        X = scaler.transform(X)
+
+    X, y = shuffle(X, y)
+
+    y = np.array(y)
+
+    allcoefs = []
+
+    kf = KFold(n_splits=n_splits, shuffle=True)
+    for train, test in kf.split(X):
+        model.fit(X[train], y[train])
+        coef_of_determination = model.score(X[test], y[test])
+
+        if False:  #(accuracy > 10 or accuracy < -10):
+            print 'coef_of_determination off', coef_of_determination
+            #pass
+            #df_train.to_csv('train.csv')
+            #np.savetxt('expected.txt', y_test, fmt='%f')
+            #np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
+            #raise Exception('Accuracy is way off', accuracy)
+        else:
+            allcoefs.append(coef_of_determination)
+
+    return np.mean(allcoefs)
+
+
+def keras_deep_test_accuracy_for_model_using_kfolds(model_fn,
+                                                    df_train,
+                                                    y,
+                                                    n_splits=4,
+                                                    epochs=10):
+    model = model_fn()
+
+    X = np.array(df_train)
+    scaler.fit(df_train)
+    X = scaler.transform(X)
+
+    y = np.array(y)
+
+    scores = []
+
+    kf = KFold(n_splits=n_splits, shuffle=True)
+    for train, test in kf.split(X):
+        history = model.fit(X[train], y[train], epochs=epochs, batch_size=128)
+
+        y_pred = model.predict(X[test])
+
+        y_pred = np.array([x[0] for x in y_pred])
+
+        if True:
+            bad_idx = np.argwhere((y_pred < 1000) | (y_pred > 1000000))
+            y_pred[bad_idx] = 200000
+        else:
+            bad_idx = np.argwhere((y_pred < 0) | (y_pred > 100))
+            y_pred[bad_idx] = 10
+
+        score = r2_score(y[test], y_pred)
+
+        print y_pred[:5]
+        print y[test][:5]
+        print 'score:', score
+        if score < 0:
+            pred = np.array(y_pred)
+            true = np.array(y[test])
+            diff = true - pred
+
+            np.savetxt('ypred.txt', pred, fmt='%f')
+            np.savetxt('ytest.txt', true, fmt='%f')
+            np.savetxt('diff.txt', diff, fmt='%f')
+            print 'error'
+            sys.exit(1)
+
+        scores.append(score)
+
+    return np.mean(scores)
+
+
+#    return r2_score(y_true, y_pred)
+
+
+def test_accuracy_rmsle(model, train, y, n_folds=5):
+    kf = KFold(
+        n_folds, shuffle=True, random_state=42).get_n_splits(train.values)
+    score = np.sqrt(-cross_val_score(
+        model, train.values, y.values, scoring="neg_mean_squared_error", cv=kf)
+                    )
+    return score.mean()
 
 
 def test_accuracy_debug(df_train, y, passes=1):

@@ -9,7 +9,11 @@ from utils.utils import *
 from utils.Training import *
 from utils.kaggle import *
 
-t = training()
+df_train = pd.read_csv('newtrain.csv')
+df_test = pd.read_csv('newtest.csv')
+schema = json.loads(open('newschema.json', 'r').read())
+
+t = Training(df_train, df_test, schema)
 
 t.dummify_at_init = False
 t.dummify_drop_first = False
@@ -18,17 +22,13 @@ t.use_label_encoding = False
 t.prepare()
 
 use_runtime_dummies = True
+n_passes = 10
 
 available_columns = list(t.df_train.columns.values)
 validated_columns = []
-best_error = 999
+best_accuracy = 0
 making_progress = True
-df_testcols = pd.DataFrame(columns=['ColName', 'RMSE'])
-
-
-def new_model():
-    return Lasso(alpha=0.0005, random_state=1)
-
+df_testcols = pd.DataFrame(columns=['ColName', 'Accuracy'])
 
 while (making_progress):
     df_testcols = df_testcols[0:0]  # remove all
@@ -37,28 +37,35 @@ while (making_progress):
         #print 'Testing column', test_column
         test_columns = validated_columns + [test_column]
 
+        #print 'before',t.df_train.columns
         df_train = t.df_train[test_columns].copy()
+        #print 'retaining',test_columns
+        #print 'got',df_train.columns
 
         if use_runtime_dummies:
             df_train, _ = t.do_dummify(df_train, None, False)
+        #print df_train.columns
+        #print df_train.head()
 
-        rmse = test_accuracy_rmsle(new_model(), df_train, t.labels)
+        #accuracy = test_accuracy(df_train, t.labels, passes=n_passes) * 100
+        accuracy = test_accuracy_kfolds(df_train, t.labels)
 
-        df_testcols.loc[len(df_testcols)] = [test_column, rmse]
+        #print 'Accuracy for column', test_column, ':', accuracy
+        df_testcols.loc[len(df_testcols)] = [test_column, accuracy]
 
-    min_error = df_testcols['RMSE'].min()
-    best_column = df_testcols['ColName'][df_testcols['RMSE'] ==
-                                         min_error].min()[0]
+    max_accuracy = df_testcols['Accuracy'].max()
+    best_column = df_testcols['ColName'][df_testcols['Accuracy'] ==
+                                         max_accuracy].max()[0]
 
-    ranked_test_columns = df_testcols.sort_values('RMSE', ascending=True)
+    ranked_test_columns = df_testcols.sort_values('Accuracy', ascending=False)
     #print ranked_test_columns.head()
     best_column = ranked_test_columns.iloc[0, 0]
 
-    diff_error = min_error - best_error
-    print 'Found best column', best_column, 'with error', min_error, '(diff=', diff_error, ')'
+    diff_accuracy = max_accuracy - best_accuracy
+    print 'Found best column', best_column, 'with accuracy', max_accuracy, '(diff=', diff_accuracy, ')'
 
-    if (diff_error < 0):
-        best_error = min_error
+    if (diff_accuracy > 0):
+        best_accuracy = max_accuracy
         validated_columns.append(best_column)
         available_columns.remove(best_column)
         print 'Retained columns:', validated_columns
@@ -66,7 +73,7 @@ while (making_progress):
         making_progress = False
 
 print 'Final columns', validated_columns
-print 'Final error', best_error
+print 'Final accuracy', best_accuracy
 
 t.retain_columns(validated_columns)
 
