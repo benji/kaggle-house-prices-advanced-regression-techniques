@@ -1,13 +1,18 @@
 import pandas as pd
-import math, json, sys
+import math
+import json
+import sys
 import numpy as np
 from sklearn import preprocessing, cross_validation, svm
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import shuffle
-from sklearn.model_selection import KFold, cross_val_score, train_test_split
+from sklearn.model_selection import KFold, cross_val_score, train_test_split, StratifiedKFold
 from sklearn.utils import shuffle
 from sklearn.metrics import r2_score
+from sklearn.metrics import mean_squared_error
+from keras import backend as K
+from scipy.optimize import leastsq
 
 pd.options.mode.chained_assignment = None  # default='warn'
 import warnings
@@ -29,11 +34,11 @@ def dummify_col_with_schema(col, schema, df_train, df_test=None):
                 'Coming with different number of columns for train and test!')
 
     scol = schema['columns'][col]
-    if (scol['type'] == 'BINARY' or scol['type'] == 'CATEGORICAL'):
+    if scol['type'] == 'CATEGORICAL':
         # now conversion to categorical strings should work
         df_train[col] = df_train[col].astype(
             'category', categories=scol['categories'])
-        
+
         if df_test is not None:
             df_test[col] = df_test[col].astype(
                 'category', categories=scol['categories'])
@@ -52,19 +57,20 @@ def dummify_col_with_schema(col, schema, df_train, df_test=None):
         df_train, drop_first=dummify_drop_first, columns=[col])
 
     newcolumns = set(df_train2.columns) - set(df_train.columns)
-    #print 'New dummy columns:', newcolumns
+    # print 'New dummy columns:', newcolumns
 
     meaningful_columns = []
     meaningless_columns = []
 
     for nc in newcolumns:
         if df_train2[nc].nunique() == 1:
-            #print 'Dummy column', nc, 'has only 1 value', df_train2[nc].iloc[
+            # print 'Dummy column', nc, 'has only 1 value', df_train2[nc].iloc[
             #    0], ', removing it.'
             df_train2.drop(nc, 1, inplace=True)
             meaningless_columns.append(nc)
         else:
             meaningful_columns.append(nc)
+        schema['columns'][nc] = {'type': 'NUMERIC'}
 
     if len(meaningful_columns) == 0:
         print df_train[col].head()
@@ -90,12 +96,12 @@ def dummify_col_with_schema(col, schema, df_train, df_test=None):
     return df_train, df_test
 
 
-def dummify_with_schema(schema, df_train, df_test=None):
+def dummify_with_schema_deprecated(schema, df_train, df_test=None):
     for col in schema['columns']:
         if col in df_train.columns:
-            #print col
+            # print col
             scol = schema['columns'][col]
-            if (scol['type'] == 'BINARY' or scol['type'] == 'CATEGORICAL'):
+            if scol['type'] == 'CATEGORICAL':
                 df_train[col] = df_train[col].astype(
                     'category', categories=scol['categories'])
                 if df_test is not None:
@@ -113,7 +119,7 @@ def dummify_with_schema(schema, df_train, df_test=None):
     df_train2 = pd.get_dummies(df_train, drop_first=dummify_drop_first)
 
     # print some stats
-    #print 'Dummified columns:', set(df_train.columns) - set(df_train2.columns)
+    # print 'Dummified columns:', set(df_train.columns) - set(df_train2.columns)
 
     df_train = df_train2
 
@@ -130,12 +136,12 @@ def dummify_with_schema(schema, df_train, df_test=None):
     return df_train, df_test
 
 
-def dummify(schema, df_train, df_test=None):
+def dummify_deprecated(schema, df_train, df_test=None):
     for col in schema:
         if col in df_train.columns:
-            #print col
+            # print col
             scol = schema[col]
-            if (scol['type'] == 'BINARY' or scol['type'] == 'CATEGORICAL'):
+            if scol['type'] == 'CATEGORICAL':
                 df_train[col] = df_train[col].astype(
                     'category', categories=scol['categories'])
                 if df_test is not None:
@@ -171,15 +177,15 @@ def test_accuracy(df_train, y, passes=1):
 
         clf.fit(X_train, y_train)
         accuracy = clf.score(X_test, y_test)
-        #print accuracy
+        # print accuracy
 
-        if False:  #(accuracy > 10 or accuracy < -10):
+        if False:  # (accuracy > 10 or accuracy < -10):
             print 'acc off', accuracy
-            #pass
-            #df_train.to_csv('train.csv')
-            #np.savetxt('expected.txt', y_test, fmt='%f')
-            #np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
-            #raise Exception('Accuracy is way off', accuracy)
+            # pass
+            # df_train.to_csv('train.csv')
+            # np.savetxt('expected.txt', y_test, fmt='%f')
+            # np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
+            # raise Exception('Accuracy is way off', accuracy)
         else:
             accuracies.append(accuracy)
 
@@ -212,17 +218,95 @@ def test_accuracy_for_model_using_kfolds(model,
         model.fit(X[train], y[train])
         coef_of_determination = model.score(X[test], y[test])
 
-        if False:  #(accuracy > 10 or accuracy < -10):
-            print 'coef_of_determination off', coef_of_determination
-            #pass
-            #df_train.to_csv('train.csv')
-            #np.savetxt('expected.txt', y_test, fmt='%f')
-            #np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
-            #raise Exception('Accuracy is way off', accuracy)
-        else:
-            allcoefs.append(coef_of_determination)
+        allcoefs.append(coef_of_determination)
 
     return np.mean(allcoefs)
+
+
+# expects np arrays
+def custom_rmse_using_kfolds(trainFn,
+                             predictFn,
+                             X,
+                             y,
+                             n_splits=10,
+                             doShuffle=True,
+                             scale=True):
+    return custom_score_using_kfolds(trainFn,
+                                     predictFn,
+                                     rmse,
+                                     X,
+                                     y,
+                                     n_splits,
+                                     doShuffle,
+                                     scale)
+
+
+# expects np arrays
+def custom_score_using_kfolds(trainFn,
+                              predictFn,
+                              scoreFn,
+                              X,
+                              y,
+                              n_splits=10,
+                              doShuffle=True,
+                              scale=True,
+                              seed=-1):
+    if scale:
+        scaler.fit(X)
+        X = scaler.transform(X)
+
+    scores = []
+    kf = KFold(n_splits=n_splits, shuffle=doShuffle)
+    split_i = 1
+
+    for train, test in kf.split(X):
+        score = doScore(trainFn, predictFn, scoreFn,
+                        X[train], X[test], y[train], y[test])
+        #print 'split', split_i, 'score', score
+        scores.append(score)
+        split_i += 1
+
+    print 1
+    print scores
+    print np.array(scores).shape
+    print np.array(scores).mean()
+
+    return np.mean(scores)
+
+
+def score_using_test_ratio(trainFn, predictFn, scoreFn,
+                           X, y, test_ratio=.25):
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_ratio)
+    return doScore(trainFn, predictFn, scoreFn, X_train, X_test, y_train, y_test)
+
+
+def doScore(trainFn, predictFn, scoreFn, X_train, X_test, y_train, y_test):
+    trainFn(X_train, y_train)
+    y_pred = predictFn(X_test)
+    return scoreFn(y_pred, y_test)
+
+
+def doShuffle(X, y, seed=None, doShuffle=True):
+    if not doShuffle:
+        return X, y
+
+    if seed is not None:
+        return shuffle(X, y, random_state=seed)
+    else:
+        return shuffle(X, y)
+
+
+def rmse(y_predicted, y_actual):
+    tmp = np.power(y_actual - y_predicted, 2) / y_actual.shape[0]
+    return np.sqrt(np.sum(tmp))
+
+
+def cod(y_pred, y_true):
+    y_mean = np.mean(y_true)
+    SSres = np.sum(np.power(y_true - y_pred, 2))
+    SStot = np.sum(np.power(y_true - y_mean, 2))
+    return 1 - SSres / SStot
 
 
 def keras_deep_test_accuracy_for_model_using_kfolds(model_fn,
@@ -278,54 +362,12 @@ def keras_deep_test_accuracy_for_model_using_kfolds(model_fn,
 
 #    return r2_score(y_true, y_pred)
 
-
-def test_accuracy_rmsle(model, train, y, n_folds=5):
-    kf = KFold(
-        n_folds, shuffle=True, random_state=42).get_n_splits(train.values)
-    score = np.sqrt(-cross_val_score(
-        model, train.values, y.values, scoring="neg_mean_squared_error", cv=kf)
-                    )
-    return score.mean()
-
-
-def test_accuracy_debug(df_train, y, passes=1):
-
-    scaler.fit(df_train)
-    X = np.array(df_train)
-    X = scaler.transform(X)
-
-    cut = -400
-
-    X_train = X[:cut]
-    X_test = X[cut:]
-
-    y_train = y[:cut].values
-    y_test = y[cut:].values
-
-    accuracies = []
-
-    for _ in range(passes):
-        #X_train, X_test, y_train, y_test = cross_validation.train_test_split(
-        #    X, y, test_size=0.3)
-
-        clf.fit(X_train, y_train)
-        accuracy = clf.score(X_test, y_test)
-        #print accuracy
-
-        #np.savetxt('test.txt', X_test, fmt='%f')
-        #np.savetxt('expected.txt', y_test, fmt='%f')
-        #np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
-
-        if False:  #(accuracy > 10 or accuracy < -10):
-            print 'acc off', accuracy
-            #pass
-            #np.savetxt('expected.txt', y_test, fmt='%f')
-            #np.savetxt('predicted.txt', clf.predict(X_test), fmt='%f')
-            #raise Exception('Accuracy is way off', accuracy)
-        else:
-            accuracies.append(accuracy)
-
-    return np.mean(accuracies)
+# def test_accuracy_rmsle(model, train, y, n_folds=5):
+#    kf = KFold(
+#        n_folds, shuffle=True, random_state=42).get_n_splits(train.values)
+#    score = np.sqrt(-cross_val_score(model, train.values,
+#                                     y.values, scoring="neg_mean_squared_error", cv=kf))
+#    return score.mean()
 
 
 def generate_predictions(y,
@@ -414,3 +456,18 @@ def get_pandas_types(schema):
 
     print types
     return types
+
+
+def generate_least_square_best_fit(x, y, order):
+    def func(coefs, x):
+        sum = 0
+        for i in range(order+1):
+            sum += coefs[i]*x**i
+        return sum
+
+    def error_fn(coefs, x, y):
+        return func(coefs, x) - y
+
+    coefs, success = leastsq(error_fn, np.zeros(order+1), args=(x, y))
+
+    return lambda x: func(coefs, x), coefs

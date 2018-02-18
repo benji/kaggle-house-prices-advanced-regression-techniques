@@ -1,0 +1,575 @@
+# id: the column name for the ID
+# target: the column name for the target variable
+# columns: information about the features
+#   <column name>
+#      type: NUMERIC / CATEGORICAL
+#      categories: for CATEGORICAL only, the list of possible categories
+#      meaningful_order: for CATEGORICAL only, whether or not the order is meaningful
+#      possibly_categorical: for NUMERIC only, whether or not this feature might be treated as CATEGORICAL
+#      possibly_numerical: for CATEGORICAL only, whether or not this feature's values may be converted to float and treated as NUMERIC
+id: Id
+target: SalePrice
+columns:
+  1stFlrSF:
+    type: NUMERIC
+  2ndFlrSF:
+    type: NUMERIC
+  3SsnPorch:
+    type: NUMERIC
+  Alley:
+    categories:
+    - NA
+    - Grvl
+    - Pave
+    type: CATEGORICAL
+    meaningful_order: true
+  BedroomAbvGr:
+    type: NUMERIC
+    possibly_categorical: true
+  BldgType:
+    categories:
+    - 1Fam
+    - 2FmCon
+    - Duplx
+    - TwnhsE
+    - TwnhsI
+    type: CATEGORICAL
+  BsmtCond:
+    categories:
+    - NA
+    - Po
+    - Fa
+    - TA
+    - Gd
+    - Ex
+    type: CATEGORICAL
+    meaningful_order: true
+  BsmtExposure:
+    categories:
+    - NA
+    - 'No'
+    - Mn
+    - Av
+    - Gd
+    type: CATEGORICAL
+    meaningful_order: true
+  BsmtFinSF1:
+    type: NUMERIC
+  BsmtFinSF2:
+    type: NUMERIC
+  BsmtFinType1:
+    categories:
+    - NA
+    - Unf
+    - LwQ
+    - Rec
+    - BLQ
+    - ALQ
+    - GLQ
+    type: CATEGORICAL
+    meaningful_order: true
+  BsmtFinType2:
+    categories:
+    - NA
+    - Unf
+    - LwQ
+    - Rec
+    - BLQ
+    - ALQ
+    - GLQ
+    type: CATEGORICAL
+    meaningful_order: true
+  BsmtFullBath:
+    type: NUMERIC
+    possibly_categorical: true
+  BsmtHalfBath:
+    type: NUMERIC
+    possibly_categorical: true
+  BsmtQual:
+    categories:
+    - NA
+    - Po
+    - Fa
+    - TA
+    - Gd
+    - Ex
+    type: CATEGORICAL
+    meaningful_order: true
+  BsmtUnfSF:
+    type: NUMERIC
+  CentralAir:
+    categories:
+    - Y
+    - N
+    type: CATEGORICAL
+  Condition1:
+    categories:
+    - Artery
+    - Feedr
+    - Norm
+    - RRNn
+    - RRAn
+    - PosN
+    - PosA
+    - RRNe
+    - RRAe
+    type: CATEGORICAL
+  Condition2:
+    categories:
+    - Artery
+    - Feedr
+    - Norm
+    - RRNn
+    - RRAn
+    - PosN
+    - PosA
+    - RRNe
+    - RRAe
+    type: CATEGORICAL
+  Electrical:
+    categories:
+    - SBrkr
+    - FuseA
+    - FuseF
+    - FuseP
+    - Mix
+    type: CATEGORICAL
+  EnclosedPorch:
+    type: NUMERIC
+  ExterCond:
+    categories:
+    - Po
+    - Fa
+    - TA
+    - Gd
+    - Ex
+    type: CATEGORICAL
+    meaningful_order: true
+  ExterQual:
+    categories:
+    - Po
+    - Fa
+    - TA
+    - Gd
+    - Ex
+    type: CATEGORICAL
+    meaningful_order: true
+  Exterior1st:
+    categories:
+    - AsbShng
+    - AsphShn
+    - BrkComm
+    - BrkFace
+    - CBlock
+    - CemntBd
+    - HdBoard
+    - ImStucc
+    - MetalSd
+    - Other
+    - Plywood
+    - PreCast
+    - Stone
+    - Stucco
+    - VinylSd
+    - Wd Sdng
+    - WdShing
+    type: CATEGORICAL
+  Exterior2nd:
+    categories:
+    - AsbShng
+    - AsphShn
+    - BrkComm
+    - BrkFace
+    - CBlock
+    - CemntBd
+    - HdBoard
+    - ImStucc
+    - MetalSd
+    - Other
+    - Plywood
+    - PreCast
+    - Stone
+    - Stucco
+    - VinylSd
+    - Wd Sdng
+    - WdShing
+    type: CATEGORICAL
+  Fence:
+    categories:
+    - GdPrv
+    - MnPrv
+    - GdWo
+    - MnWw
+    - NA
+    type: CATEGORICAL
+  FireplaceQu:
+    categories:
+    - NA
+    - Po
+    - Fa
+    - TA
+    - Gd
+    - Ex
+    type: CATEGORICAL
+    meaningful_order: true
+  Fireplaces:
+    type: NUMERIC
+    possibly_categorical: true
+  Foundation:
+    categories:
+    - BrkTil
+    - CBlock
+    - PConc
+    - Slab
+    - Stone
+    - Wood
+    type: CATEGORICAL
+  FullBath:
+    type: NUMERIC
+    possibly_categorical: true
+  Functional:
+    categories:
+    - Sal
+    - Sev
+    - Maj2
+    - Maj1
+    - Mod
+    - Min2
+    - Min1
+    - Typ
+    type: CATEGORICAL
+    meaningful_order: true
+  GarageArea:
+    type: NUMERIC
+  GarageCars:
+    type: NUMERIC
+    possibly_categorical: true
+  GarageCond:
+    categories:
+    - NA
+    - Po
+    - Fa
+    - TA
+    - Gd
+    - Ex
+    type: CATEGORICAL
+    meaningful_order: true
+  GarageFinish:
+    categories:
+    - NA
+    - Unf
+    - RFn
+    - Fin
+    type: CATEGORICAL
+    meaningful_order: true
+  GarageQual:
+    categories:
+    - NA
+    - Po
+    - Fa
+    - TA
+    - Gd
+    - Ex
+    type: CATEGORICAL
+    meaningful_order: true
+  GarageType:
+    categories:
+    - Basment
+    - CarPort
+    - NA
+    - Attchd
+    - BuiltIn
+    - 2Types
+    - Detchd
+    type: CATEGORICAL
+  GarageYrBlt:
+    type: NUMERIC
+  GrLivArea:
+    type: NUMERIC
+  HalfBath:
+    type: NUMERIC
+    possibly_categorical: true
+  Heating:
+    categories:
+    - Floor
+    - GasA
+    - GasW
+    - Grav
+    - OthW
+    - Wall
+    type: CATEGORICAL
+  HeatingQC:
+    categories:
+    - Po
+    - Fa
+    - TA
+    - Gd
+    - Ex
+    type: CATEGORICAL
+    meaningful_order: true
+  HouseStyle:
+    categories:
+    - 1Story
+    - 1.5Fin
+    - 1.5Unf
+    - 2Story
+    - 2.5Fin
+    - 2.5Unf
+    - SFoyer
+    - SLvl
+    type: CATEGORICAL
+  KitchenAbvGr:
+    type: NUMERIC
+    possibly_categorical: true
+  KitchenQual:
+    categories:
+    - Po
+    - Fa
+    - TA
+    - Gd
+    - Ex
+    type: CATEGORICAL
+    meaningful_order: true
+  LandContour:
+    categories:
+    - Bnk
+    - Lvl
+    - HLS
+    - Low
+    type: CATEGORICAL
+  LandSlope:
+    categories:
+    - Gtl
+    - Mod
+    - Sev
+    type: CATEGORICAL
+    meaningful_order: true
+  LotArea:
+    type: NUMERIC
+  LotConfig:
+    categories:
+    - Inside
+    - Corner
+    - CulDSac
+    - FR2
+    - FR3
+    type: CATEGORICAL
+  LotFrontage:
+    type: NUMERIC
+  LotShape:
+    categories:
+    - IR3
+    - IR2
+    - IR1
+    - Reg
+    type: CATEGORICAL
+    meaningful_order: true
+  LowQualFinSF:
+    type: NUMERIC
+  MSSubClass:
+    categories:
+    - '20'
+    - '30'
+    - '40'
+    - '45'
+    - '50'
+    - '60'
+    - '70'
+    - '75'
+    - '80'
+    - '85'
+    - '90'
+    - '120'
+    - '150'
+    - '160'
+    - '180'
+    - '190'
+    type: CATEGORICAL
+  MSZoning:
+    categories:
+    - A
+    - C
+    - FV
+    - I
+    - RH
+    - RL
+    - RP
+    - RM
+    - C (all)
+    type: CATEGORICAL
+  MasVnrArea:
+    type: NUMERIC
+  MasVnrType:
+    categories:
+    - BrkCmn
+    - BrkFace
+    - CBlock
+    - None
+    - Stone
+    type: CATEGORICAL
+  MiscFeature:
+    categories:
+    - Elev
+    - Gar2
+    - Othr
+    - Shed
+    - TenC
+    - NA
+    type: CATEGORICAL
+  MiscVal:
+    type: NUMERIC
+  MoSold:
+    type: NUMERIC
+    possibly_categorical: true
+  Neighborhood:
+    categories:
+    - Blmngtn
+    - Blueste
+    - BrDale
+    - BrkSide
+    - ClearCr
+    - CollgCr
+    - Crawfor
+    - Edwards
+    - Gilbert
+    - Greens
+    - GrnHill
+    - IDOTRR
+    - Landmrk
+    - MeadowV
+    - Mitchel
+    - Names
+    - NoRidge
+    - NPkVill
+    - NridgHt
+    - NWAmes
+    - OldTown
+    - SWISU
+    - Sawyer
+    - SawyerW
+    - Somerst
+    - StoneBr
+    - Timber
+    - Veenker
+    type: CATEGORICAL
+  OpenPorchSF:
+    type: NUMERIC
+  OverallCond:
+    categories:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    - '7'
+    - '8'
+    - '9'
+    - '10'
+    type: CATEGORICAL
+    meaningful_order: true
+    possibly_numerical: true
+  OverallQual:
+    categories:
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    - '7'
+    - '8'
+    - '9'
+    - '10'
+    type: CATEGORICAL
+    meaningful_order: true
+    possibly_numerical: true
+  PavedDrive:
+    categories:
+    - N
+    - P
+    - Y
+    type: CATEGORICAL
+    meaningful_order: true
+  PoolArea:
+    type: NUMERIC
+  PoolQC:
+    categories:
+    - Po
+    - Fa
+    - TA
+    - Gd
+    - Ex
+    type: CATEGORICAL
+    tonum: true
+    meaningful_order: true
+  RoofMatl:
+    categories:
+    - ClyTile
+    - CompShg
+    - Membran
+    - Metal
+    - Roll
+    - Tar&Grv
+    - WdShake
+    - WdShngl
+    type: CATEGORICAL
+  RoofStyle:
+    categories:
+    - Flat
+    - Gable
+    - Gambrel
+    - Hip
+    - Mansard
+    - Shed
+    type: CATEGORICAL
+  SaleCondition:
+    categories:
+    - Normal
+    - Abnorml
+    - AdjLand
+    - Alloca
+    - Family
+    - Partial
+    type: CATEGORICAL
+  SaleType:
+    categories:
+    - WD
+    - CWD
+    - VWD
+    - New
+    - COD
+    - Con
+    - ConLw
+    - ConLI
+    - ConLD
+    - Oth
+    type: CATEGORICAL
+  ScreenPorch:
+    type: NUMERIC
+  Street:
+    categories:
+    - Grvl
+    - Pave
+    type: CATEGORICAL
+  TotRmsAbvGrd:
+    type: NUMERIC
+    possibly_categorical: true
+  TotalBsmtSF:
+    type: NUMERIC
+  Utilities:
+    categories:
+    - NoSewr
+    - AllPub
+    - NoSeWa
+    - ELO
+    type: CATEGORICAL
+  WoodDeckSF:
+    type: NUMERIC
+  YearBuilt:
+    type: NUMERIC
+  YearRemodAdd:
+    type: NUMERIC
+  YrSold:
+    type: NUMERIC
+

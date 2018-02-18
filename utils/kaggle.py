@@ -1,4 +1,8 @@
-import math, json, sys, os
+import math
+import json
+import sys
+import os
+import yaml
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -27,7 +31,7 @@ def training():
 
     df_train = pd.read_csv('../data/train.csv')
     df_test = pd.read_csv('../data/test.csv')
-    schema = json.loads(open('../schema2.json', 'r').read())
+    schema = yaml.safe_load(open('../schema.yaml', 'r').read())
 
     # NA round 1
 
@@ -41,13 +45,29 @@ def training():
 
         df["LotFrontage"].fillna(0, inplace=True)
 
-    #.fillna(np.mean(df_train["LotFrontage"].values),inplace=True)
-
     # ADD CUSTOM FEATURES
 
-    #df_train['DateSold'] = df_train['YrSold'] + df_train['MoSold'] / 12.0
-    #df_test['DateSold'] = df_test['YrSold'] + df_test['MoSold'] / 12.0
-    #schema['columns']['DateSold'] = {'type': 'NUMERIC'}
+    for df in [df_train, df_test]:
+        df["Age"] = 2010 - df["YearBuilt"]
+        schema['columns']['Age'] = {'type': 'NUMERIC'}
+
+        df["YearsSinceRemodel"] = df["YrSold"] - df["YearRemodAdd"]
+        schema['columns']['YearsSinceRemodel'] = {'type': 'NUMERIC'}
+
+        df["TimeSinceSold"] = 2010 - df["YrSold"]
+        schema['columns']['TimeSinceSold'] = {'type': 'NUMERIC'}
+
+        df["Remodeled"] = (df["YearRemodAdd"] != df["YearBuilt"]) * 1
+        schema['columns']['Remodeled'] = {'type': 'NUMERIC'}
+
+        df["RecentRemodel"] = (df["YearRemodAdd"] == df["YrSold"]) * 1
+        schema['columns']['RecentRemodel'] = {'type': 'NUMERIC'}
+
+        df["VeryNewHouse"] = (df["YearBuilt"] == df["YrSold"]) * 1
+        schema['columns']['VeryNewHouse'] = {'type': 'NUMERIC'}
+
+        df['DateSold'] = df['YrSold'] + df['MoSold'] / 12.0
+        schema['columns']['DateSold'] = {'type': 'NUMERIC'}
 
     df_train[
         'TotalSF'] = df_train['TotalBsmtSF'] + df_train['1stFlrSF'] + df_train['2ndFlrSF']
@@ -67,6 +87,7 @@ def training():
     t.replace_values.append(['Exterior2nd', 'Brk Cmn', 'BrkComm'])
     t.replace_values.append(['Exterior2nd', 'CmentBd', 'CemntBd'])
     t.replace_values.append(['Exterior2nd', 'Wd Shng', 'WdShing'])
+    t.replace_values.append(['BsmtExposure', 'No', 'None'])
 
     # NA round 2
 
@@ -105,23 +126,30 @@ def training():
     # NORMALIZE SOME FEATURES
 
     t.logify_columns.append('SalePrice')
-    t.logify_columns.extend(('LotArea', 'GrLivArea', '1stFlrSF','LotFrontage','TotalBsmtSF','TotalSF'))
+    t.logify_columns.extend(
+        ('LotArea', 'GrLivArea', '1stFlrSF', 'TotalBsmtSF', 'TotalSF'))  # ,'LotFrontage'
 
     # REMOVE A FEW OULIERS
-
-    t.remove_outliers = [524, 1299]  # +3%!
-    #t.remove_outliers.extend((249, 313, 335, 706)) # >100000 LotArea
+    t.remove_outliers = [524, 1299]  #,935 +3%!
+    # t.remove_outliers.extend((249, 313, 335, 706)) # >100000 LotArea
     #t.remove_outliers.extend((934, 1298,346))
-
-    # hack to convert 20 to '020'
-    mssc_cats = schema['columns']['MSSubClass']['categories']
-    for c in mssc_cats:
-        t.replace_values.append(['MSSubClass', int(c), c])
 
     if True:
         for c in t.numerical_columns():
-            t.numerical_singularities_columns.append(c)
-    
-    t.enable_transform_preferred_to_numerical = True
+            t.numerical_singularities_columns.append([c, 0])
+
+    #t.enable_transform_preferred_to_numerical = True
 
     return t
+
+
+if __name__ == "__main__":
+    t = training()
+
+    t.dummify_at_init = False
+    t.dummify_drop_first = False
+    t.use_label_encoding = False
+
+    t.prepare()
+
+    t.save('../tmp')
