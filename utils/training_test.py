@@ -37,10 +37,10 @@ class TestTraining(unittest.TestCase):
         self.t = Training(df_train, df_test, schema)
 
     def test_dummies(self):
-        self.t.dummify_at_init = True
-        self.t.prepare()
+        self.t.dummify_all_categoricals()
+        print self.t.df_train.columns
 
-        self.assertEqual(3, len(self.t.df_train.columns))
+        self.assertEqual(2, len(self.t.df_train.columns))
 
         values = self.t.df_train['sex_M'].unique()
         self.assertEqual(2, len(values))
@@ -50,8 +50,7 @@ class TestTraining(unittest.TestCase):
     def test_label_encoding(self):
         self.assertEqual('M', self.t.df_train.iloc[0]['sex'])
 
-        self.t.use_label_encoding = True
-        self.t.prepare()
+        self.t.label_encode_all_categoricals()
 
         # test categories order from schema is respected
         self.assertEqual(1, self.t.df_train.iloc[0]['sex'])

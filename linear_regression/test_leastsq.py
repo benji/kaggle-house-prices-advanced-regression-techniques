@@ -27,8 +27,6 @@ t.use_label_encoding = False
 t.train_columns = [col]
 
 
-# t.remove_outliers.append(935)
-
 t.prepare()
 
 df = t.df_train

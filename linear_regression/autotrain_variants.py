@@ -14,9 +14,8 @@ from utils.kaggle import *
 from utils.Variants import *
 
 t = training()
-t.explode_possible_types_columns = True
-
-t.prepare()
+t.explode_columns_possibilities()
+t.health_check()
 
 
 def score(X, y_true):

@@ -23,14 +23,24 @@ from utils.Variants import *
 from utils.AveragingModels import *
 
 t = training()
+t.scale = False
 t.explode_possible_types_columns = True
 
 train_variants = [['OverallQual', 'target_mean'], ['TotalSF', 'none'], ['Neighborhood', 'one_hot'], ['OverallCond', 'label_encoding'], ['BsmtFinType1', 'one_hot'], ['GarageCars', 'none'], ['MSSubClass', 'one_hot'], ['LotArea', 'none'], ['YearBuilt', 'none'], ['MSZoning', 'one_hot'], ['BsmtFinSF1', 'none'], ['SaleCondition', 'target_mean'], ['2ndFlrSF', 'extract_0'], ['KitchenQual', 'one_hot'], ['BsmtExposure', 'one_hot'], ['Functional', 'target_mean'], ['GrLivArea', 'none'], ['Condition1', 'one_hot'], ['HeatingQC', 'target_mean'], ['Fireplaces', 'none'], ['ScreenPorch', 'extract_0'], ['BsmtFullBath', 'none'], ['BsmtQual', 'one_hot'], ['CentralAir', 'label_encoding'], ['YearRemodAdd', 'none'], ['PoolArea', 'none'], [
     'Heating', 'one_hot'], ['RoofMatl', 'target_mean'], ['Foundation', 'target_mean'], ['GarageCond', 'target_mean'], ['HalfBath', 'extract_0'], ['FullBath', 'extract_0'], ['KitchenAbvGr', 'none'], ['LotConfig', 'one_hot'], ['ExterQual', 'label_encoding'], ['Exterior1st', 'label_encoding'], ['WoodDeckSF', 'extract_0'], ['Exterior2nd', 'label_encoding'], ['GarageQual', 'one_hot'], ['BsmtFinSF2', 'extract_0'], ['LotFrontage', 'extract_0'], ['HouseStyle', 'target_mean'], ['1stFlrSF', 'none'], ['MiscVal', 'extract_0'], ['GarageArea', 'extract_0'], ['ExterCond', 'label_encoding'], ['MasVnrArea', 'none'], ['MasVnrType', 'label_encoding'], ['MoSold_categorical', 'target_mean'], ['TotalBsmtSF', 'none'], ['BsmtHalfBath', 'none']]
 
+retained_cols = [v[0] for v in train_variants]
+t.train_columns = retained_cols
+
 t.prepare()
 
-variants = Variants(t)
+
+def score(X, y_true):
+    model = Lasso(alpha=0.0005, random_state=1)
+    return custom_score_using_kfolds(model.fit, model.predict, rmse, X, y_true, n_splits=10, doShuffle=False, scale=True)
+
+
+variants = Variants(t, score_fn=None)
 variants.apply_variants(t, train_variants)
 
 lasso = make_pipeline(RobustScaler(), Lasso(alpha=0.0005, random_state=1))

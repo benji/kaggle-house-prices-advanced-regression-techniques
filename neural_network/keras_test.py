@@ -116,9 +116,6 @@ print 'Final RMSE:', np.array(last_n_scores).mean()
 
 print 'weigths', model.layers[0].get_weights()[0][:3]
 sys.exit(0)
-# acc = keras_deep_test_accuracy_for_model_using_kfolds(
-#    build_model, t.df_train, t.labels, n_splits=4,epochs=epochs)
-#print 'Cross validation R2:', acc
 
 # ModelCheckpoint(kfold_weights_path, monitor='val_loss', save_best_only=True, verbose=0),
 

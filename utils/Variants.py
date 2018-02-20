@@ -39,12 +39,13 @@ CATEGORICAL_TECHNIQUES = [CATEGORICAL_ONEHOT,
 
 class Variants:
 
-    def __init__(self, t, score_fn, remove_invalid=True):
+    def __init__(self, t, score_fn=None, remove_invalid=True, verbose=False):
         self.t_original = t
         self.t_committed = None
         self.score_fn = score_fn
         self.all_individual_variants = self.generate_all_variants_combinations()
         self.commited_variants = []
+        self.verbose = verbose
 
     def remove_invalid_variants(self):
         print 'Testing variants validity...'
@@ -82,37 +83,41 @@ class Variants:
             v for v in self.all_individual_variants if not v[0] in existing_cols]
         return new_variants
 
-    def apply_variants(self, t2, variants):
+    def apply_variants(self, t2, variants, fail_on_error=True):
         for variant in variants:
             c = variant[0]
             op = variant[1]
 
+            if self.verbose:
+                print 'Applying variant', op, 'on column', c
+
+            success = True
+
             if op == CATEGORICAL_ONEHOT:
-                if not t2.do_dummify_column(c, False):
-                    return False
+                success = t2.dummify_column(c)
             elif op == CATEGORICAL_LABEL_ENCODING:
-                if not t2.do_label_encode_column(c):
-                    return False
+                success = t2.label_encode_column(c, fail_on_unseen=False)
             elif op == CATEGORICAL_TARGET_MEAN:
-                if not t2.replace_categorical_with_mean(c):
-                    return False
+                success = t2.replace_categorical_with_mean(c)
             elif op == NUMERICAL_EXTRACT_0:
-                if not t2.numerical_singularities(c, 0):
-                    return False
+                success = t2.regularize_linear_numerical_singularity(c, 0)
             elif op == NUMERICAL_QUANTILE_BIN_5:
-                if not t2.quantile_bin(c, 5):
-                    return False
+                success = t2.quantile_bin(c, 5)
             elif op == NUMERICAL_QUANTILE_BIN_10:
-                if not t2.quantile_bin(c, 10):
-                    return False
+                success = t2.quantile_bin(c, 10)
             elif op == NUMERICAL_QUANTILE_BIN_20:
-                if not t2.quantile_bin(c, 20):
-                    return False
+                success = t2.quantile_bin(c, 20)
             elif op == NUMERICAL_LINEARIZE_ORDER_2:
-                if not t2.linearize_polynomial_fit(c, 2):
-                    return False
+                success = t2.linearize_column_with_polynomial_x_transform(c, 2)
             elif op == NUMERICAL_EXTRACT_0_LINEARIZE_ORDER_2:
-                if not t2.linearize_polynomial_fit(c, 2, 0):
+                success = t2.linearize_column_with_polynomial_x_transform(
+                    c, 2, 0)
+
+            if not success:
+                if fail_on_error:
+                    raise Exception(
+                        'Failed to applying variant', op, 'on column', c)
+                else:
                     return False
 
         return True
@@ -125,8 +130,15 @@ class Variants:
         t2 = self.get_data_copy_for_columns(uncommitted_cols)
         t2.verbose = False
 
-        if not self.apply_variants(t2, uncommitted_variants):
+        if not self.apply_variants(t2, uncommitted_variants, fail_on_error=False):
             return FAIL_SCORE
+
+        # t2.scale()
+
+        # t2.remove_columns_with_unique_value()
+        # t2.sanity()
+        # t2.health_check()
+        # t2.summary()
 
         return self.score_fn(t2.df_train.values, t2.labels.values)
 

@@ -1,4 +1,7 @@
-import math, json, sys, os
+import math
+import json
+import sys
+import os
 import pandas as pd
 from os import path
 import yaml
@@ -14,40 +17,32 @@ from utils.utils import *
 from utils.kaggle import *
 from utils.Training import *
 
+cols = [
+    'OverallQual', 'TotalSF', 'Neighborhood', 'OverallCond', 'BsmtQual',
+    'MSSubClass', 'GarageArea', 'BsmtUnfSF', 'YearBuilt', 'LotArea',
+    'MSZoning', 'Fireplaces', 'Functional', 'HeatingQC', 'SaleCondition',
+    'Condition1', 'BsmtExposure', 'GrLivArea', 'BsmtFinType1',
+    'KitchenQual', 'BsmtFinSF1', 'Exterior1st', '2ndFlrSF', 'GarageCars',
+    'ScreenPorch', 'WoodDeckSF', 'BsmtFullBath', 'CentralAir', '1stFlrSF',
+    'HalfBath', 'PoolArea', 'GarageYrBlt', 'MasVnrType', 'ExterQual',
+    'KitchenAbvGr', 'FullBath', 'LotConfig', 'Foundation', 'LowQualFinSF',
+    'BedroomAbvGr', 'BsmtFinSF2', 'Condition2', 'PoolQC'
+]
+
 t = training()
-
-
-t.dummify_at_init = True
-t.dummify_drop_first = False
-t.use_label_encoding = False
-t.replace_all_categoricals_with_mean = True
-t.categoricals_with_mean=['Neighborhood']
-
-if True:
-    t.train_columns = [
-        'OverallQual', 'TotalSF', 'Neighborhood', 'OverallCond', 'BsmtQual',
-        'MSSubClass', 'GarageArea', 'BsmtUnfSF', 'YearBuilt', 'LotArea',
-        'MSZoning', 'Fireplaces', 'Functional', 'HeatingQC', 'SaleCondition',
-        'Condition1', 'BsmtExposure', 'GrLivArea', 'BsmtFinType1',
-        'KitchenQual', 'BsmtFinSF1', 'Exterior1st', '2ndFlrSF', 'GarageCars',
-        'ScreenPorch', 'WoodDeckSF', 'BsmtFullBath', 'CentralAir', '1stFlrSF',
-        'HalfBath', 'PoolArea', 'GarageYrBlt', 'MasVnrType', 'ExterQual',
-        'KitchenAbvGr', 'FullBath', 'LotConfig', 'Foundation', 'LowQualFinSF',
-        'BedroomAbvGr', 'BsmtFinSF2', 'Condition2', 'PoolQC'
-    ]
-
-if False:
-    t.train_columns = [
-        'OverallQual', 'TotalSF', 'Neighborhood', 'OverallCond', 'BsmtQual',
-        'MSSubClass'
-    ]
-
-t.prepare()
-
-#t.sanity()
-t.save('tmp')
-
-#t.df_train, t.df_test = t.do_dummify(t.df_train, t.df_test, False)
+t.explode_columns_possibilities()
+t.dummify_all_categoricals()
+# t.label_encode_all_categoricals()
+#t.replace_all_categoricals_with_mean()
+# t.replace_categorical_with_mean('Neighborhood')
+# t.retain_columns(cols)
+t.scale()
+t.shuffle()
+t.remove_columns_with_unique_value()
+t.sanity()
+#t.save('tmp')
+t.health_check()
+t.summary()
 
 model0 = Lasso(alpha=0.0005, random_state=1)
 model = make_pipeline(RobustScaler(), model0)
