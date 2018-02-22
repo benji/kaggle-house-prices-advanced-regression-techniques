@@ -30,6 +30,7 @@ cols = [
 ]
 
 t = training()
+
 t.explode_columns_possibilities()
 t.dummify_all_categoricals()
 # t.label_encode_all_categoricals()
@@ -41,8 +42,16 @@ t.shuffle()
 t.remove_columns_with_unique_value()
 t.sanity()
 #t.save('tmp')
-t.health_check()
+t.ready_for_takeoff()
 t.summary()
+
+assert t.diagnose_nas() == 0
+X,X_test = t.df_train.values, t.df_test.values
+#X,X_test = t.pca(n_components=200)
+
+#X = t.df_train.values
+#X_test = t.df_test.values
+y = t.labels.values
 
 model0 = Lasso(alpha=0.0005, random_state=1)
 model = make_pipeline(RobustScaler(), model0)
@@ -60,19 +69,21 @@ rmse_score = custom_score_using_kfolds(
     train,
     predict,
     rmse,
-    np.array(t.df_train.values),
-    np.array(t.labels.values),
+    np.array(X),
+    np.array(y),
     scale=True,
     doShuffle=True)
 
 print 'KFold RMSE:', rmse_score
 
+sys.exit(0)
+
 cod_score = custom_score_using_kfolds(
     train,
     predict,
     cod,
-    np.array(t.df_train.values),
-    np.array(t.labels.values),
+    np.array(X),
+    np.array(y),
     scale=True,
     doShuffle=True)
 
@@ -87,7 +98,7 @@ print 'RMSE', test_accuracy_rmsle(model, t.df_train, t.labels)
 df_predicted = pd.DataFrame(columns=['Id', 'SalePrice'])
 df_predicted['Id'] = t.test_ids
 df_predicted.set_index('Id')
-df_predicted['SalePrice'] = np.exp(model.predict(t.df_test))
+df_predicted['SalePrice'] = np.exp(model.predict(X_test))
 df_predicted.to_csv('predicted.csv', sep=',', index=False)
 
 print 'predictions done.'

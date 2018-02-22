@@ -11,7 +11,10 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import RobustScaler
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.model_selection import KFold, cross_val_score, train_test_split
+from sklearn.utils import shuffle
 from sklearn.ensemble import RandomForestRegressor,  GradientBoostingRegressor
+from sklearn.preprocessing import StandardScaler
+
 import xgboost as xgb
 import lightgbm as lgb
 
@@ -48,8 +51,8 @@ model_lgb = lgb.LGBMRegressor(objective='regression', num_leaves=5,
                               min_data_in_leaf=6, min_sum_hessian_in_leaf=11)
 
 
-models = [lasso, ENet, KRR, GBoost, model_xgb, model_lgb]
-stacked_model = lasso
+models = [lasso, ENet, KRR]#, GBoost, model_xgb, model_lgb]
+stacked_model = clone(lasso)#clone(model_lgb)
 
 t = training()
 t.explode_columns_possibilities()
@@ -71,15 +74,15 @@ t.summary()
 X = np.array(t.df_train.values)
 y = np.array(t.labels.values)
 
-n_splits = 10
+n_splits = 5
 kf = KFold(n_splits=n_splits, shuffle=False)
 
 stacked_train = pd.DataFrame()
 
 model_i = 1
 for m in models:
-    print 'Model:', m
-
+    m = clone(m)
+    print 'Model:', model_i
     model_predictions = np.zeros(shape=(len(X)))
 
     split_i = 1
@@ -94,9 +97,52 @@ for m in models:
     model_i += 1
 
 print 'Completed out of folds predictions.'
-print stacked_train.head()
 
+stacked_train, y = shuffle(stacked_train.values, y)
 
-score = score_using_test_ratio(stacked_model.fit, stacked_model.predict, rmse,
-                               stacked_train.values, y, test_ratio=.25)
+scaler = StandardScaler()
+scaler.fit(stacked_train)
+stacked_train = scaler.transform(stacked_train)
+
+stacked_model_score = clone(stacked_model)
+score = score_using_test_ratio(
+    stacked_model_score.fit, stacked_model_score.predict, rmse, stacked_train, y, test_ratio=.25)
 print 'Stacked model RMSE:', score
+
+
+print "Fitting on whole dataset for predictions..."
+stacked_model_pred = clone(stacked_model)
+
+print 'train stacked model for pred against:'
+print stacked_train[:5]
+stacked_model_pred.fit(stacked_train, y)
+
+
+# test
+print 'score test',rmse(stacked_model_pred.predict(stacked_train),y)
+
+
+if True:
+    sys.exit(0)
+
+print "Producing out of folds predictions for test data"
+X_pred = np.array(t.df_test.values)
+stacked_test = pd.DataFrame()
+model_i = 1
+for m in models:
+    m = clone(m)
+    print 'Model:', model_i
+    m.fit(X, y)
+    y_pred = m.predict(X_pred)
+    stacked_test['model_'+str(model_i)] = y_pred
+    model_i += 1
+
+stacked_test = scaler.transform(stacked_test.values)
+
+df_predicted = pd.DataFrame(columns=['Id', 'SalePrice'])
+df_predicted['Id'] = t.test_ids
+df_predicted.set_index('Id')
+df_predicted['SalePrice'] = np.exp(stacked_model_pred.predict(stacked_test))
+df_predicted.to_csv('predicted.csv', sep=',', index=False)
+
+print 'predictions done.'

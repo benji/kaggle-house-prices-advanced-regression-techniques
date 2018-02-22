@@ -6,6 +6,8 @@ import yaml
 import copy
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import QuantileTransformer
+from sklearn.decomposition import PCA, KernelPCA
 
 from utils import *
 
@@ -139,6 +141,60 @@ class Training:
         assert self.df_train.shape[0] == len(self.train_ids)
         if self.df_test is not None:
             assert self.df_test.shape[0] == len(self.test_ids)
+
+    def ready_for_takeoff(self):
+        self.health_check()
+
+        print 'Check for NAs'
+        assert self.diagnose_nas() == 0
+
+        self.assert_numerical(self.df_train)
+        self.assert_numerical(self.df_test)
+
+        if False:
+            self.fail_on_value(np.inf)
+            self.fail_on_value(np.nan)
+
+            for c in self.get_columns():
+                self.fail_if_found(self.df_train, self.df_train[c] > 1000)
+                self.fail_if_found(self.df_train, self.df_train[c] < -1000)
+                self.fail_if_found(self.df_test, self.df_train[c] > 1000)
+                self.fail_if_found(self.df_test, self.df_train[c] < -1000)
+
+            if np.isnan(np.sum(self.df_train.values)):
+                raise Exception('Found NANs!')
+            if np.isnan(np.sum(self.df_test.values)):
+                raise Exception('Found NANs!')
+
+    def hasnan(self, df):
+        return np.isnan(np.sum(df.values))
+    
+    def fail_if_found(self, df, selected):
+        found = self.df_train[selected]
+        if len(found) > 0:
+            print found.head()
+            raise Exception('Found erroneous values')
+
+    def assert_numerical(self, df):
+        for c in df.columns:
+            t = self.coltype(c)
+            if t != 'NUMERIC':
+                raise Exception('Columns'+c+'is of schema type'+t)
+            dt = df[c].dtype
+            if dt != np.float64:
+                raise Exception('Columns'+c+'is of panda type'+dt)
+
+    def fail_on_value(self, v):
+        for c in self.get_columns():
+            nvals = len(self.df_train[self.df_train[c] == v])
+            if nvals > 0:
+                raise Exception(
+                    'Found', nvals, v, 'values in train data for column', c)
+            nvals = len(self.df_test[self.df_test[c] == v])
+            if nvals > 0:
+                raise Exception(
+                    'Found', nvals, v, 'values in test data for column', c)
+        print 'No inf found.'
 
     def diagnose_nas(self):
         maxtrain = self.df_train.isnull().sum().max()
@@ -361,10 +417,15 @@ class Training:
 
     ##### NORMALIZATION #####
 
-    def scale(self):
+    def scale(self, use_quantile_transformer=False):
         print 'Scaling features ...'
+
+        if use_quantile_transformer:
+            scaler = QuantileTransformer(n_quantiles=10, random_state=0)
+        else:
+            scaler = StandardScaler()
+
         columns = self.df_train.columns
-        scaler = StandardScaler()
         scaler.fit(self.df_train[columns])
         self.df_train[columns] = scaler.transform(self.df_train[columns])
         self.df_test[columns] = scaler.transform(self.df_test[columns])
@@ -426,6 +487,22 @@ class Training:
             self.df_test[c][test_singulars] = mean_target
 
         return True
+
+    def pca(self, n_components):
+        '''Helps decorrelating features'''
+        pca = PCA(n_components=n_components)
+
+        a = self.df_train.reset_index(drop=True)
+        b = self.df_test.reset_index(drop=True)
+
+        all_data = pd.concat([a,b], axis=0)
+
+        if self.hasnan(all_data):
+            raise Exception('found NANs')
+
+        pca.fit(all_data.values)
+
+        return pca.transform(self.df_train.values), pca.transform(self.df_test.values)
 
     ##### NUMERICAL TRANSFORMATIONS #####
 
