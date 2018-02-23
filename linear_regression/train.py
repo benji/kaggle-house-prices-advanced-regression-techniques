@@ -36,7 +36,7 @@ t.dummify_all_categoricals()
 # t.label_encode_all_categoricals()
 #t.replace_all_categoricals_with_mean()
 # t.replace_categorical_with_mean('Neighborhood')
-# t.retain_columns(cols)
+t.retain_columns(cols)
 t.scale()
 t.shuffle()
 t.remove_columns_with_unique_value()
@@ -47,7 +47,7 @@ t.summary()
 
 assert t.diagnose_nas() == 0
 X,X_test = t.df_train.values, t.df_test.values
-#X,X_test = t.pca(n_components=200)
+#X,X_test = t.pca(n_components=348)
 
 #X = t.df_train.values
 #X_test = t.df_test.values
