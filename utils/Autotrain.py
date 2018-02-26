@@ -53,6 +53,10 @@ class Autotrain:
             if variants_fn is not None:
                 available_variants = variants_fn(validated_variants)
 
+            if len(available_variants) == 0:
+                print 'No more variants to evaluate.'
+                break
+
             mulitple_variants = [validated_variants +
                                  [v] for v in available_variants]
 

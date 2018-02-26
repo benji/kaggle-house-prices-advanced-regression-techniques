@@ -37,8 +37,12 @@ def training():
 
     # REMOVE A FEW OULIERS
 
-    for i in [88,462,523,588,632,968,1298,1324]:
-        t.drop_row_by_index(i)
+    #for i in [88,462,523,588,632,968,1298,1324]:
+    #    t.drop_row_by_index(i)
+
+    #for i in [30, 964, 409, 493, 683, 1445, 1424, 869, 706]:
+    #    t.drop_row_by_index(i)
+    
     #t.drop_row_by_id(524)
     #t.drop_row_by_id(1299)
 

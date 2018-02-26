@@ -8,6 +8,11 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import QuantileTransformer, RobustScaler
 from sklearn.decomposition import PCA, KernelPCA
+from random import random
+import statsmodels
+import statsmodels.api as smapi
+from statsmodels.formula.api import ols
+
 
 from utils import *
 
@@ -317,7 +322,8 @@ class Training:
 
     def drop_column(self, col):
         if col in self.df_train.columns:
-            print 'Dropping', col
+            if self.verbose:
+                print 'Dropping', col
             self.df_train = self.df_train.drop([col], axis=1)
             self.df_test = self.df_test.drop([col], axis=1)
 
@@ -331,10 +337,15 @@ class Training:
         self.drop_row_by_index(idx)
 
     def drop_row_by_index(self, idx):
-        print 'dropping training row(s) at index', idx
+        if self.verbose:
+                print 'dropping training row at index', idx
         self.df_train.drop(idx, inplace=True)
         self.train_ids.drop(idx, inplace=True)
         self.labels.drop(idx, inplace=True)
+
+    def drop_rows_by_indexes(self, arr):
+        for i in arr:
+            self.drop_row_by_index(i)
 
     ####### MISSING VALUES #######
 
@@ -696,3 +707,38 @@ class Training:
         self.schema['columns'][c]['type'] = 'NUMERIC'
 
         return True
+
+    def autoremove_ouliers2(self):
+        print 'Starting outliers detection...'
+        x = self.df_train.values
+        y = self.labels.values
+        regression = ols("data ~ x", data=dict(data=y, x=x)).fit()
+        test = regression.outlier_test()
+        print test
+        print test.head()
+        print test[test['bonf(p)'] < 0.5]
+        sorted = test[test['bonf(p)'] < 0.5].sort_values('bonf(p)')
+        print sorted.index
+        
+        for i in sorted.index:
+            self.drop_row_by_index(i)
+
+    def autoremove_ouliers(self):
+        outlier_test = self.compute_outliers()
+        bonf_test = outliers_test['bonf(p)']
+        bonf_outliers = list(bonf_test[bonf_test<1e-3].index)
+
+        for i in bonf_outliers:
+            self.drop_row_by_index(i)
+
+    def compute_outliers(self):
+        '''time consuming'''
+        print 'Computing outliers...'
+        x = self.df_train
+        y = self.labels
+        model = smapi.OLS(y,x)
+        results = model.fit()
+        outliers_test = results.outlier_test().sort_values('bonf(p)')
+        return outliers_test
+
+    
