@@ -21,16 +21,17 @@ class Autotrain:
     to get consistent results.
     '''
 
-    def __init__(self, verbose=False):
+    def __init__(self, verbose=False, stop_if_no_progress=True):
         self.verbose = verbose
+        self.stop_if_no_progress = stop_if_no_progress
 
-    def find_single_best(self, variants, score_variant_fn=None, goal='min',tqdm=False):
+    def find_single_best(self, variants, score_variant_fn=None, goal='min', tqdm=False):
         '''
         Finds the one variant that yields the best score
         '''
-        return self.__find_single_best_with_score_fn(variants, score_variant_fn, goal,use_tqdm=tqdm)
+        return self.__find_single_best_with_score_fn(variants, score_variant_fn, goal, use_tqdm=tqdm)
 
-    def find_multiple_best(self, variants=None, variants_fn=None, score_variants_fn=None, goal='min',on_validated_variant_fn=None,tqdm=True):
+    def find_multiple_best(self, variants=None, variants_fn=None, score_variants_fn=None, goal='min', on_validated_variant_fn=None, tqdm=True):
         '''
         Finds the list of variants that yields the best score.
         Here a variant is a list of variants.
@@ -42,14 +43,13 @@ class Autotrain:
         You can implement this method if you need to remove more.
         '''
         validated_variants = []
-        making_progress = True
         best_score = None
 
         if variants_fn is None:
             available_variants = list(variants)  # copy
 
         round_i = 1
-        while making_progress:
+        while True:
             if variants_fn is not None:
                 available_variants = variants_fn(validated_variants)
 
@@ -57,14 +57,18 @@ class Autotrain:
                                  [v] for v in available_variants]
 
             mulitple_variant, score = self.__find_single_best_with_score_fn(
-                mulitple_variants, score_variants_fn, goal, best_score=best_score,use_tqdm=tqdm)
+                mulitple_variants, score_variants_fn, goal, use_tqdm=tqdm)
 
-            print 'Round', round_i, 'score:', score, 'variants:', mulitple_variant
+            improved = self.is_better_score(best_score, score, goal)
 
-            if mulitple_variant is None:
+            print 'Round', round_i, 'score:', score, 'improved:', improved, 'variants:', mulitple_variant
+
+            if self.stop_if_no_progress and not improved:
                 break
 
-            best_score = score
+            if improved:
+                best_score = score
+
             elected_variant = mulitple_variant[-1]
             validated_variants.append(elected_variant)
 
@@ -81,25 +85,28 @@ class Autotrain:
 
         return validated_variants, best_score
 
-    def __find_single_best_with_score_fn(self, variants, score_variant_fn, goal, best_score=None,use_tqdm=False):
+    def is_better_score(self, ref_score, new_score, goal):
+        if ref_score is None:
+            return True
+        elif goal == 'min' and new_score < ref_score:
+            return True
+        elif goal == 'max' and new_score > ref_score:
+            return True
+        else:
+            return False
+
+    def __find_single_best_with_score_fn(self, variants, score_variant_fn, goal, use_tqdm=False):
         '''Finds the one variant that yields the best score'''
         best_variant = None
+        best_score = None
 
         for v in tqdm(variants, disable=not use_tqdm):
-            is_best = False
             score = score_variant_fn(v)
 
             if self.verbose:
                 print 'score:', score, 'variant:', v
 
-            if best_score is None:
-                is_best = True
-            elif goal == 'min' and score < best_score:
-                is_best = True
-            elif goal == 'max' and score > best_score:
-                is_best = True
-
-            if is_best:
+            if self.is_better_score(best_score, score, goal):
                 best_score = score
                 best_variant = v
 

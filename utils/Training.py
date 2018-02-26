@@ -6,7 +6,7 @@ import yaml
 import copy
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import QuantileTransformer
+from sklearn.preprocessing import QuantileTransformer, RobustScaler
 from sklearn.decomposition import PCA, KernelPCA
 
 from utils import *
@@ -30,6 +30,7 @@ class Training:
 
         self.labels = self.extract_column(self.df_train, self.targetcol)
 
+        self.numericals_as_float()
         self.categoricals_as_string()
 
         self.health_check()
@@ -168,7 +169,7 @@ class Training:
 
     def hasnan(self, df):
         return np.isnan(np.sum(df.values))
-    
+
     def fail_if_found(self, df, selected):
         found = self.df_train[selected]
         if len(found) > 0:
@@ -179,10 +180,10 @@ class Training:
         for c in df.columns:
             t = self.coltype(c)
             if t != 'NUMERIC':
-                raise Exception('Columns'+c+'is of schema type'+t)
+                raise Exception('Column '+c+' is of schema type '+t)
             dt = df[c].dtype
-            if dt != np.float64:
-                raise Exception('Columns'+c+'is of panda type'+dt)
+            if not np.issubdtype(dt, np.number):
+                raise Exception('Column '+c+' is of panda type '+str(dt))
 
     def fail_on_value(self, v):
         for c in self.get_columns():
@@ -282,9 +283,8 @@ class Training:
     def shuffle(self):
         print "Everyday I'm shuffling..."
         perm = np.random.permutation(self.df_train.index)
-        self.df_train.reindex(perm)
-        # if self.labels is not None:
-        self.labels.reindex(perm)
+        self.df_train = self.df_train.reindex(perm)
+        self.labels = self.labels.reindex(perm)
 
     ###### ADD / REMOVE COLUMNS / ROWS #####
 
@@ -328,7 +328,10 @@ class Training:
 
     def drop_row_by_id(self, rowid):
         idx = self.train_ids[self.train_ids == rowid].index[0]
-        print 'dropping training row', rowid, 'at index', idx
+        self.drop_row_by_index(idx)
+
+    def drop_row_by_index(self, idx):
+        print 'dropping training row(s) at index', idx
         self.df_train.drop(idx, inplace=True)
         self.train_ids.drop(idx, inplace=True)
         self.labels.drop(idx, inplace=True)
@@ -418,15 +421,18 @@ class Training:
     ##### NORMALIZATION #####
 
     def scale(self, use_quantile_transformer=False):
-        print 'Scaling features ...'
+        if self.verbose:
+            print 'Scaling features ...'
 
         if use_quantile_transformer:
             scaler = QuantileTransformer(n_quantiles=10, random_state=0)
         else:
+            #scaler = RobustScaler()
             scaler = StandardScaler()
 
         columns = self.df_train.columns
         scaler.fit(self.df_train[columns])
+
         self.df_train[columns] = scaler.transform(self.df_train[columns])
         self.df_test[columns] = scaler.transform(self.df_test[columns])
 
@@ -495,7 +501,7 @@ class Training:
         a = self.df_train.reset_index(drop=True)
         b = self.df_test.reset_index(drop=True)
 
-        all_data = pd.concat([a,b], axis=0)
+        all_data = pd.concat([a, b], axis=0)
 
         if self.hasnan(all_data):
             raise Exception('found NANs')
@@ -522,11 +528,8 @@ class Training:
 
         self.df_test[col] = pd.cut(self.df_test[col], bins=bins)
 
-        # categorical to binaries
-        self.df_train = pd.get_dummies(self.df_train, columns=[
-                                       col], drop_first=True, prefix=col)
-        self.df_test = pd.get_dummies(
-            self.df_test, columns=[col], drop_first=True, prefix=col)
+        self.convert_numerical_column_to_categorical(col)
+        self.dummify_column(col)
 
         return True
 
@@ -542,6 +545,16 @@ class Training:
         '''Preserves the nan values'''
         self.df_transform(self.df_categoricals_as_string)
 
+    def df_numericals_as_string(self, df):
+        for col in self.numerical_columns():
+            nan_idx = df[col].isnull()
+            df[col] = df[col].astype(float)
+            df[col][nan_idx] = np.nan
+
+    def numericals_as_float(self):
+        '''Preserves the nan values'''
+        self.df_transform(self.df_numericals_as_string)
+
     def convert_numerical_column_to_categorical(self, c):
         ''' Infers categories automatically form data '''
         train_categories = self.df_train[c].unique().tolist()
@@ -551,7 +564,8 @@ class Training:
             c, categories)
 
     def convert_numerical_column_to_categorical_with_categories(self, c, categories):
-        print 'Transform numerical column', c, 'to categorical'
+        if self.verbose:
+            print 'Transform numerical column', c, 'to categorical'
         self.df_train[c] = self.df_train[c].astype(str)
 
         if self.df_test is not None:
@@ -561,7 +575,8 @@ class Training:
             'type': 'CATEGORICAL', 'categories': categories}
 
     def convert_categorical_column_to_numerical(self, c):
-        print 'Transform categorical column', c, 'to numerical'
+        if self.verbose:
+            print 'Transform categorical column', c, 'to numerical'
         self.df_train[c] = self.df_train[c].astype(float)
 
         if self.df_test is not None:
@@ -616,7 +631,7 @@ class Training:
             print 'Label encoding of column', c, 'has only 1 value', self.df_train[c].iloc[0]
             return False
 
-        self.schema['columns'][c] = {'type': 'NUMERIC'}
+        self.convert_categorical_column_to_numerical(c)
 
         return True
 
@@ -624,7 +639,7 @@ class Training:
         for c in self.categorical_columns():
             self.replace_categorical_with_mean(c)
 
-    def replace_categorical_with_mean(self, c):
+    def replace_categorical_with_mean2(self, c):
         if self.verbose:
             print 'Replacing', c, 'with mean...'
 
@@ -632,16 +647,48 @@ class Training:
 
         _unique_train_values = self.df_train[c].unique()
 
+        # we can't find the mean target for test values NOT in train set
+        # so let's take global mean
+        self.df_test[c][~ self.df_test[c].isin(
+            _unique_train_values)] = global_mean
+
         for v in _unique_train_values:
             matching = (self.df_train[c] == v)
             mean = self.labels[matching].mean()
             self.df_train[c][matching] = mean
             self.df_test[c][self.df_test[c] == v] = mean
 
-        # we can't find the mean target for test values NOT in train set
-        # so let's take global mean
+        self.df_train[c] = self.df_train[c].astype(float)
+        self.df_test[c] = self.df_test[c].astype(float)
+
+        self.schema['columns'][c]['type'] = 'NUMERIC'
+
+        return True
+
+    def replace_categorical_with_mean(self, c):
+        return self.replace_categorical_with_labels_transform(c, 'mean', lambda ls: ls.mean())
+
+    def replace_categorical_with_median(self, c):
+        return self.replace_categorical_with_labels_transform(c, 'median', lambda ls: ls.median())
+
+    def replace_categorical_with_labels_transform(self, c, tranform_name, labels_transform):
+        if self.verbose:
+            print 'Replacing', c, 'with ', tranform_name, '...'
+
+        global_val = labels_transform(self.labels)
+
+        _unique_train_values = self.df_train[c].unique()
+
+        # we can't find the val target for test values NOT in train set
+        # so let's take global val
         self.df_test[c][~ self.df_test[c].isin(
-            _unique_train_values)] = global_mean
+            _unique_train_values)] = global_val
+
+        for v in _unique_train_values:
+            matching = (self.df_train[c] == v)
+            val = labels_transform(self.labels[matching])
+            self.df_train[c][matching] = val
+            self.df_test[c][self.df_test[c] == v] = val
 
         self.df_train[c] = self.df_train[c].astype(float)
         self.df_test[c] = self.df_test[c].astype(float)

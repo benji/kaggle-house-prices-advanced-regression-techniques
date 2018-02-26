@@ -17,6 +17,7 @@ FAIL_SCORE = 9999
 NUMERICAL_NONE = 'none'
 NUMERICAL_EXTRACT_0 = 'extract_0'
 NUMERICAL_LINEARIZE_ORDER_2 = 'linearize_order_2'
+NUMERICAL_LINEARIZE_ORDER_3 = 'linearize_order_3'
 NUMERICAL_EXTRACT_0_LINEARIZE_ORDER_2 = 'extract_0_linearize_order_2'
 NUMERICAL_QUANTILE_BIN_5 = 'quantile_bin(5)'
 NUMERICAL_QUANTILE_BIN_10 = 'quantile_bin(10)'
@@ -25,6 +26,7 @@ NUMERICAL_TECHNIQUES = [NUMERICAL_NONE,
                         NUMERICAL_EXTRACT_0,
                         NUMERICAL_LINEARIZE_ORDER_2,
                         NUMERICAL_EXTRACT_0_LINEARIZE_ORDER_2,
+                        NUMERICAL_LINEARIZE_ORDER_3,
                         NUMERICAL_QUANTILE_BIN_5,
                         NUMERICAL_QUANTILE_BIN_10,
                         NUMERICAL_QUANTILE_BIN_20]
@@ -32,9 +34,11 @@ NUMERICAL_TECHNIQUES = [NUMERICAL_NONE,
 CATEGORICAL_ONEHOT = 'one_hot'
 CATEGORICAL_LABEL_ENCODING = 'label_encoding'
 CATEGORICAL_TARGET_MEAN = 'target_mean'
+CATEGORICAL_TARGET_MEDIAN = 'target_median'
 CATEGORICAL_TECHNIQUES = [CATEGORICAL_ONEHOT,
                           CATEGORICAL_LABEL_ENCODING,
-                          CATEGORICAL_TARGET_MEAN]
+                          CATEGORICAL_TARGET_MEAN,
+                          CATEGORICAL_TARGET_MEDIAN]
 
 
 class Variants:
@@ -53,7 +57,7 @@ class Variants:
         excluded = 0
 
         for v in self.all_individual_variants:
-            score = self.score_variants([v])
+            score = self.score_variants([v], scale=False)
             if score == FAIL_SCORE:
                 # print 'Excluding erroneous variant', v
                 excluded += 1
@@ -99,6 +103,8 @@ class Variants:
                 success = t2.label_encode_column(c, fail_on_unseen=False)
             elif op == CATEGORICAL_TARGET_MEAN:
                 success = t2.replace_categorical_with_mean(c)
+            elif op == CATEGORICAL_TARGET_MEDIAN:
+                success = t2.replace_categorical_with_median(c)
             elif op == NUMERICAL_EXTRACT_0:
                 success = t2.regularize_linear_numerical_singularity(c, 0)
             elif op == NUMERICAL_QUANTILE_BIN_5:
@@ -109,6 +115,8 @@ class Variants:
                 success = t2.quantile_bin(c, 20)
             elif op == NUMERICAL_LINEARIZE_ORDER_2:
                 success = t2.linearize_column_with_polynomial_x_transform(c, 2)
+            elif op == NUMERICAL_LINEARIZE_ORDER_3:
+                success = t2.linearize_column_with_polynomial_x_transform(c, 3)
             elif op == NUMERICAL_EXTRACT_0_LINEARIZE_ORDER_2:
                 success = t2.linearize_column_with_polynomial_x_transform(
                     c, 2, 0)
@@ -122,7 +130,7 @@ class Variants:
 
         return True
 
-    def score_variants(self, variants):
+    def score_variants(self, variants, scale=True):
         # print 'scoring variants', variants
         uncommitted_variants = self.get_uncommited_variants(variants)
         uncommitted_cols = [v[0] for v in uncommitted_variants]
@@ -133,12 +141,8 @@ class Variants:
         if not self.apply_variants(t2, uncommitted_variants, fail_on_error=False):
             return FAIL_SCORE
 
-        # t2.scale()
-
-        # t2.remove_columns_with_unique_value()
-        # t2.sanity()
-        # t2.health_check()
-        # t2.summary()
+        if scale:
+            t2.scale()
 
         return self.score_fn(t2.df_train.values, t2.labels.values)
 

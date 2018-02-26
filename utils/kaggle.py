@@ -37,8 +37,10 @@ def training():
 
     # REMOVE A FEW OULIERS
 
-    t.drop_row_by_id(524)
-    t.drop_row_by_id(1299)
+    for i in [88,462,523,588,632,968,1298,1324]:
+        t.drop_row_by_index(i)
+    #t.drop_row_by_id(524)
+    #t.drop_row_by_id(1299)
 
     # HANDLE TYPOS IN THE DATA
 
