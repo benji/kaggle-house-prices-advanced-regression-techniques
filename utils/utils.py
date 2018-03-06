@@ -18,6 +18,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 import warnings
 warnings.filterwarnings('ignore')
 
+
 def dummify_col_with_schema(col, schema, df_train, df_test=None):
     if not col in df_train.columns:
         raise Exception('Could\'t find column', col, ' in training dataset')
@@ -91,7 +92,8 @@ def dummify_col_with_schema(col, schema, df_train, df_test=None):
 
 
 # expects np arrays
-def custom_rmse_using_kfolds(trainFn,
+# deprecated
+def __custom_rmse_using_kfolds(trainFn,
                              predictFn,
                              X,
                              y,
@@ -116,12 +118,7 @@ def custom_score_using_kfolds(trainFn,
                               y,
                               n_splits=10,
                               doShuffle=True,
-                              scale=True,
                               seed=-1):
-    if scale:
-        scaler = StandardScaler()
-        scaler.fit(X)
-        X = scaler.transform(X)
 
     scores = []
     kf = KFold(n_splits=n_splits, shuffle=doShuffle)
@@ -138,9 +135,9 @@ def custom_score_using_kfolds(trainFn,
 
 
 def score_using_test_ratio(trainFn, predictFn, scoreFn,
-                           X, y, test_ratio=.25):
+                           X, y, test_ratio=.25, shuffle=True):
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_ratio)
+        X, y, test_size=test_ratio, shuffle=shuffle)
     return doScore(trainFn, predictFn, scoreFn, X_train, X_test, y_train, y_test)
 
 
@@ -161,8 +158,13 @@ def doShuffle(X, y, seed=None, doShuffle=True):
 
 
 def rmse(y_predicted, y_actual):
-    tmp = np.power(y_actual - y_predicted, 2) / y_actual.shape[0]
-    return np.sqrt(np.sum(tmp))
+    if y_predicted.shape != y_actual.shape:
+        print "ERROR: incompatible shapes", y_predicted.shape, y_actual.shape
+        #y_predicted = [v[0] for v in y_predicted]
+        sys.exit(1)
+    tmp = np.power(y_actual - y_predicted, 2)
+    tmp = tmp.mean()
+    return np.sqrt(tmp)
 
 
 def cod(y_pred, y_true):

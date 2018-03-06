@@ -29,7 +29,7 @@ variants.apply_variants(t, train_variants)
 t.health_check()
 
 score_test_ratio = 0.1
-n_scores_per_variant = 10
+n_scores_per_variant = 100
 
 
 def score(X, y_true):
@@ -42,38 +42,19 @@ def score(X, y_true):
     # return custom_score_using_kfolds(model.fit, model.predict, rmse, X, y_true, n_splits=10, doShuffle=False, scale=True)
 
 
-mean_target = t.labels.mean()
-y_mean = np.ones(len(t.labels))*mean_target
-mean_score = rmse(y_mean, t.labels.values)
-print 'Score of the constant mean prediction:', mean_score
+available_indexes = list(t.df_train.index)
 
-autotrain = Autotrain(verbose=False, stop_if_no_progress=True)
+print 'base score (no outliers):', score(t.df_train.values, t.labels.values)
 
-available_indexes = list(t.df_train.index)[:4]
+results = pd.DataFrame(columns=['outlier_index', 'score'])
 
-
-def generate_variants(existing_variants=[]):
-    return [i for i in available_indexes if i not in existing_variants]
-
-
-def score_variants(outliers):
-    #print 'score outliers', outliers
+for i in tqdm(available_indexes):
     t2 = t.copy()
     t2.verbose = False
-    t2.drop_rows_by_indexes(outliers)
+    t2.drop_rows_by_indexes([i])
     thescore = score(t2.df_train.values, t2.labels.values)
-    #print 'scored', thescore
-    return thescore
+    results.loc[len(results)]=([i, thescore])
 
-
-def commit_variant(o):
-    pass
-
-best_variants, score = autotrain.find_multiple_best(
-    variants_fn=generate_variants,
-    score_variants_fn=score_variants,
-    on_validated_variant_fn=commit_variant,
-    goal='min', tqdm=True)
-
-print 'Final variants', best_variants
-print 'Final score', score
+results = results.sort_values('score', ascending=False)
+print results.head()
+results.to_csv('outliers.csv',index=False)

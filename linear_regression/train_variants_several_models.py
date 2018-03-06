@@ -22,50 +22,62 @@ from utils.Training import *
 from utils.Variants import *
 from utils.AveragingModels import *
 
+
+np.random.seed(int(time.time()))
+
+
+def seed():
+    return np.random.randint(2**32-1)
+
+
+fit_intercept = True
+
 t = training()
-t.scale = False
-t.explode_possible_types_columns = True
+t.explode_columns_possibilities()
 
-train_variants = [['OverallQual', 'target_mean'], ['TotalSF', 'none'], ['Neighborhood', 'one_hot'], ['OverallCond', 'label_encoding'], ['BsmtFinType1', 'one_hot'], ['GarageCars', 'none'], ['MSSubClass', 'one_hot'], ['LotArea', 'none'], ['YearBuilt', 'none'], ['MSZoning', 'one_hot'], ['BsmtFinSF1', 'none'], ['SaleCondition', 'target_mean'], ['2ndFlrSF', 'extract_0'], ['KitchenQual', 'one_hot'], ['BsmtExposure', 'one_hot'], ['Functional', 'target_mean'], ['GrLivArea', 'none'], ['Condition1', 'one_hot'], ['HeatingQC', 'target_mean'], ['Fireplaces', 'none'], ['ScreenPorch', 'extract_0'], ['BsmtFullBath', 'none'], ['BsmtQual', 'one_hot'], ['CentralAir', 'label_encoding'], ['YearRemodAdd', 'none'], ['PoolArea', 'none'], [
-    'Heating', 'one_hot'], ['RoofMatl', 'target_mean'], ['Foundation', 'target_mean'], ['GarageCond', 'target_mean'], ['HalfBath', 'extract_0'], ['FullBath', 'extract_0'], ['KitchenAbvGr', 'none'], ['LotConfig', 'one_hot'], ['ExterQual', 'label_encoding'], ['Exterior1st', 'label_encoding'], ['WoodDeckSF', 'extract_0'], ['Exterior2nd', 'label_encoding'], ['GarageQual', 'one_hot'], ['BsmtFinSF2', 'extract_0'], ['LotFrontage', 'extract_0'], ['HouseStyle', 'target_mean'], ['1stFlrSF', 'none'], ['MiscVal', 'extract_0'], ['GarageArea', 'extract_0'], ['ExterCond', 'label_encoding'], ['MasVnrArea', 'none'], ['MasVnrType', 'label_encoding'], ['MoSold_categorical', 'target_mean'], ['TotalBsmtSF', 'none'], ['BsmtHalfBath', 'none']]
+if False:
+    train_variants = [['TotalSF', 'linearize_order_2'], ['OverallQual', 'target_mean'], ['Neighborhood', 'one_hot'], ['OverallCond_numerical', 'none'], ['BsmtUnfSF', 'quantile_bin(10)'], ['Age', 'quantile_bin(20)'], ['LotArea', 'extract_0_linearize_order_2'], ['GarageCars_categorical', 'label_encoding'], ['MSZoning', 'one_hot'], ['Fireplaces', 'linearize_order_3'], ['Condition1', 'one_hot'], ['Functional', 'label_encoding'], ['SaleCondition', 'target_median'], [
+        'CentralAir', 'target_mean'], ['KitchenQual', 'one_hot'], ['GrLivArea', 'extract_0_linearize_order_2'], ['BsmtExposure', 'one_hot'], ['YearBuilt', 'none'], ['KitchenAbvGr_categorical', 'label_encoding'], ['YearsSinceRemodel', 'extract_0_linearize_order_2'], ['HeatingQC', 'target_median'], ['ScreenPorch', 'linearize_order_2'], ['RoofMatl', 'label_encoding'], ['GarageArea', 'linearize_order_3'], ['GarageQual', 'target_median']]
+    train_cols = [v[0] for v in train_variants]
+    t.retain_columns(train_cols)
+    variants = Variants(t, verbose=True)
+    variants.apply_variants(t, train_variants)
+else:
+    t.dummify_all_categoricals()
 
-retained_cols = [v[0] for v in train_variants]
-t.train_columns = retained_cols
+t.ready_for_takeoff()
+t.scale()
+if not fit_intercept:
+    t.scale_target()
+t.shuffle()
+t.remove_columns_with_unique_value()
+t.sanity()
+t.summary()
+# t.save('../tmp')
 
-t.prepare()
 
-
-def score(X, y_true):
-    model = Lasso(alpha=0.0005, random_state=1)
-    return custom_score_using_kfolds(model.fit, model.predict, rmse, X, y_true, n_splits=10, doShuffle=False, scale=True)
-
-
-variants = Variants(t, score_fn=None)
-variants.apply_variants(t, train_variants)
-
-lasso = make_pipeline(RobustScaler(), Lasso(alpha=0.0005, random_state=1))
-ENet = make_pipeline(RobustScaler(), ElasticNet(
-    alpha=0.0005, l1_ratio=.9, random_state=3))
+lasso = Lasso(alpha=0.0005, random_state=seed())
 KRR = KernelRidge(alpha=0.6, kernel='polynomial', degree=2, coef0=2.5)
+ENet = ElasticNet(alpha=0.0005, l1_ratio=.9, random_state=seed())
 
 GBoost = GradientBoostingRegressor(n_estimators=3000, learning_rate=0.05,
-                                   max_depth=4, max_features='sqrt',
-                                   min_samples_leaf=15, min_samples_split=10,
-                                   loss='huber', random_state=5)
+                                    max_depth=4, max_features='sqrt',
+                                    min_samples_leaf=15, min_samples_split=10,
+                                    loss='huber', random_state=seed())
 
 model_xgb = xgb.XGBRegressor(colsample_bytree=0.4603, gamma=0.0468,
-                             learning_rate=0.05, max_depth=3,
-                             min_child_weight=1.7817, n_estimators=2200,
-                             reg_alpha=0.4640, reg_lambda=0.8571,
-                             subsample=0.5213, silent=1,
-                             random_state=7, nthread=-1)
+                                learning_rate=0.05, max_depth=3,
+                                min_child_weight=1.7817, n_estimators=2200,
+                                reg_alpha=0.4640, reg_lambda=0.8571,
+                                subsample=0.5213, silent=1,
+                                random_state=7, nthread=-1)
 
 model_lgb = lgb.LGBMRegressor(objective='regression', num_leaves=5,
-                              learning_rate=0.05, n_estimators=720,
-                              max_bin=55, bagging_fraction=0.8,
-                              bagging_freq=5, feature_fraction=0.2319,
-                              feature_fraction_seed=9, bagging_seed=9,
-                              min_data_in_leaf=6, min_sum_hessian_in_leaf=11)
+                                learning_rate=0.05, n_estimators=720,
+                                max_bin=55, bagging_fraction=0.8,
+                                bagging_freq=5, feature_fraction=0.2319,
+                                feature_fraction_seed=seed(), bagging_seed=seed(),
+                                min_data_in_leaf=6, min_sum_hessian_in_leaf=11)
 
 
 models = [lasso, ENet, KRR, GBoost, model_xgb, model_lgb]
@@ -79,22 +91,9 @@ for m in models:
         rmse,
         np.array(t.df_train.values),
         np.array(t.labels.values),
-        scale=True,
         doShuffle=True)
 
     print 'KFold RMSE:', rmse_score
-
-    if False:
-        cod_score = custom_score_using_kfolds(
-            m.fit,
-            m.predict,
-            cod,
-            np.array(t.df_train.values),
-            np.array(t.labels.values),
-            scale=True,
-            doShuffle=True)
-
-        print 'COD:', cod_score
 
 sys.exit(0)
 print 'RMSE', test_accuracy_rmsle(model, t.df_train, t.labels)

@@ -31,7 +31,7 @@ class Autotrain:
         '''
         return self.__find_single_best_with_score_fn(variants, score_variant_fn, goal, use_tqdm=tqdm)
 
-    def find_multiple_best(self, variants=None, variants_fn=None, score_variants_fn=None, goal='min', on_validated_variant_fn=None, tqdm=True):
+    def find_multiple_best(self, variants=None, variants_fn=None, score_variants_fn=None, goal='min', on_validated_variant_fn=None, on_round_finish_fn=None, tqdm=True):
         '''
         Finds the list of variants that yields the best score.
         Here a variant is a list of variants.
@@ -78,6 +78,9 @@ class Autotrain:
 
             if on_validated_variant_fn is not None:
                 on_validated_variant_fn(elected_variant)
+
+            if on_round_finish_fn is not None:
+                on_round_finish_fn(validated_variants)
 
             if variants_fn is None:
                 available_variants.remove(mulitple_variant[-1])

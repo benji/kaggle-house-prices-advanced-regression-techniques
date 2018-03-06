@@ -6,6 +6,7 @@ import time
 from tqdm import tqdm
 import numpy as np
 from os import path
+import matplotlib.pyplot as plt
 
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 from utils.utils import *
@@ -30,17 +31,6 @@ variants.apply_variants(t, train_variants)
 t.health_check()
 
 score_test_ratio = 0.1
-n_scores_per_variant = 20
-
-
-def score(X, y_true):
-    model = Lasso(alpha=0.001)
-    scores = []
-    for i in range(n_scores_per_variant):
-        scores.append(score_using_test_ratio(
-            model.fit, model.predict, rmse, X, y_true, test_ratio=score_test_ratio))
-    return np.array(scores[5: -5]).mean()
-    # return custom_score_using_kfolds(model.fit, model.predict, rmse, X, y_true, n_splits=10, doShuffle=False, scale=True)
 
 
 def scoreSingle(X, y_true):
@@ -48,12 +38,37 @@ def scoreSingle(X, y_true):
     return score_using_test_ratio(
         model.fit, model.predict, rmse, X, y_true, test_ratio=score_test_ratio)
 
+# moving avg 30  -> max +/- 0.0175 diff
+# moving avg 60  -> max +/- 0.011 diff
+# moving avg 100 -> max +/- 0.008 diff (1000:0.0097)
+# moving avg 500 -> max +/- (10000:0.0027)
+
+max_iter = 100
+n_moving_average = 5
 
 scores = []
+means = []
+moving_average = []
 
-i=1
-while True:
+for i in range(max_iter):
     s = scoreSingle(t.df_train.values, t.labels.values)
     scores.append(s)
-    print np.array(scores).mean(), i
-    i+=1
+    mean = np.array(scores).mean()
+    print mean, i
+
+    means.append(mean)
+    if i >= n_moving_average:
+        moving_average.append(np.array(scores[-n_moving_average:]).mean())
+
+final_mean = means[-1]
+
+mean_diffs = [np.abs(final_mean-m) for m in means]
+
+moving_average_diff = [np.abs(final_mean-m) for m in moving_average]
+moving_average_diff = np.pad(
+    moving_average_diff, (0, n_moving_average), 'constant')
+
+xs = range(max_iter)
+
+plt.plot(xs, mean_diffs, 'r-', xs, moving_average_diff, 'g-')
+plt.show()

@@ -2,6 +2,7 @@ import math
 import json
 import sys
 import os
+import time
 import yaml
 import pandas as pd
 import numpy as np
@@ -26,6 +27,12 @@ from Training import *
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
+np.random.seed(int(time.time()))
+
+
+def seed():
+    return np.random.randint(2**32-1)
+
 
 def training():
 
@@ -35,16 +42,46 @@ def training():
 
     t = Training(df_train, df_test, schema=schema)
 
+    return kaggle_default_configure(t)
+
+
+def training_train_test_holdout(holdout=300):
+
+    for i in range(50):
+        print 'WWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAA'
+
+    df_train = shuffle(pd.read_csv('../data/train.csv'), random_state=seed())
+
+    df_test = df_train[-holdout:].copy()
+    print df_test.head()
+
+    test_labels = df_test['SalePrice'].copy()
+    df_test.drop(['SalePrice'], axis=1, inplace=True)
+
+    df_train = df_train[:-holdout].copy()
+
+    #df_test = pd.read_csv('../data/test.csv')
+    schema = yaml.safe_load(open('../schema.yaml', 'r').read())
+
+    t = Training(df_train, df_test, schema=schema)
+    t.test_labels = test_labels
+    t.y2_labels = t.labels.values[-holdout:].copy()
+
+    return kaggle_default_configure(t)
+
+
+def kaggle_default_configure(t):
+
     # REMOVE A FEW OULIERS
 
-    #for i in [88,462,523,588,632,968,1298,1324]:
+    for i in [88, 462, 523, 588, 632, 968, 1298, 1324]:
+        t.drop_row_by_index(i)
+
+    # for i in [30, 964, 409, 493, 683, 1445, 1424, 869, 706]:
     #    t.drop_row_by_index(i)
 
-    #for i in [30, 964, 409, 493, 683, 1445, 1424, 869, 706]:
-    #    t.drop_row_by_index(i)
-    
-    #t.drop_row_by_id(524)
-    #t.drop_row_by_id(1299)
+    # t.drop_row_by_id(524)
+    # t.drop_row_by_id(1299)
 
     # HANDLE TYPOS IN THE DATA
 
@@ -105,32 +142,32 @@ def training():
 
         # ADD CUSTOM FEATURES
 
-        df["Age"] = 2010 - df["YearBuilt"]
-        schema['columns']['Age'] = {'type': 'NUMERIC'}
+        #df["Age"] = 2010 - df["YearBuilt"]
+        #t.schema['columns']['Age'] = {'type': 'NUMERIC'}
 
         df["YearsSinceRemodel"] = df["YrSold"] - df["YearRemodAdd"]
-        schema['columns']['YearsSinceRemodel'] = {'type': 'NUMERIC'}
+        t.schema['columns']['YearsSinceRemodel'] = {'type': 'NUMERIC'}
 
-        df["TimeSinceSold"] = 2010 - df["YrSold"]
-        schema['columns']['TimeSinceSold'] = {'type': 'NUMERIC'}
+        #df["TimeSinceSold"] = 2010 - df["YrSold"]
+        #t.schema['columns']['TimeSinceSold'] = {'type': 'NUMERIC'}
 
         df["Remodeled"] = (df["YearRemodAdd"] != df["YearBuilt"]) * 1
-        schema['columns']['Remodeled'] = {'type': 'NUMERIC'}
+        t.schema['columns']['Remodeled'] = {'type': 'NUMERIC'}
 
         df["RecentRemodel"] = (df["YearRemodAdd"] == df["YrSold"]) * 1
-        schema['columns']['RecentRemodel'] = {'type': 'NUMERIC'}
+        t.schema['columns']['RecentRemodel'] = {'type': 'NUMERIC'}
 
         df["VeryNewHouse"] = (df["YearBuilt"] == df["YrSold"]) * 1
-        schema['columns']['VeryNewHouse'] = {'type': 'NUMERIC'}
+        t.schema['columns']['VeryNewHouse'] = {'type': 'NUMERIC'}
 
         df['DateSold'] = df['YrSold'] + df['MoSold'] / 12.0
-        schema['columns']['DateSold'] = {'type': 'NUMERIC'}
+        t.schema['columns']['DateSold'] = {'type': 'NUMERIC'}
 
         df['TotalSF'] = df['TotalBsmtSF'] + df['1stFlrSF'] + df['2ndFlrSF']
 
     t.df_transform(transform_df)
 
-    schema['columns']['TotalSF'] = {'type': 'NUMERIC'}
+    t.schema['columns']['TotalSF'] = {'type': 'NUMERIC'}
 
     #t.separate_out_value('PoolArea', 0, 'NoPool')
 

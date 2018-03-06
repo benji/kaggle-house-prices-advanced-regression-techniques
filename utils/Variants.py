@@ -57,10 +57,11 @@ class Variants:
         excluded = 0
 
         for v in self.all_individual_variants:
-            score = self.score_variants([v], scale=False)
-            if score == FAIL_SCORE:
-                # print 'Excluding erroneous variant', v
-                excluded += 1
+            t2 = self.get_data_copy_for_columns([v[0]])
+            t2.verbose = False
+
+            if not self.apply_variants(t2, [v], fail_on_error=False):
+                #print 'Excluding erroneous variant', v
                 excluded += 1
             else:
                 valid_individual_variants.append(v)
@@ -87,9 +88,15 @@ class Variants:
             v for v in self.all_individual_variants if not v[0] in existing_cols]
         return new_variants
 
-    def apply_variants(self, t2, variants, fail_on_error=True):
+    def apply_variants(self, t2, variants, fail_on_error=True, copy_column=False):
         for variant in variants:
             c = variant[0]
+
+            if copy_column:
+                newcol = c+'_'+variant[1]
+                t2.duplicate_column(c, newcol)
+                c = newcol
+
             op = variant[1]
 
             if self.verbose:
@@ -126,6 +133,8 @@ class Variants:
                     raise Exception(
                         'Failed to applying variant', op, 'on column', c)
                 else:
+                    if self.verbose:
+                        print 'Invalid variant.'
                     return False
 
         return True

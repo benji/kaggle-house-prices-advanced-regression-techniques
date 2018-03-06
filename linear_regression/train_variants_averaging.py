@@ -1,5 +1,6 @@
 import math
 import json
+import time
 import sys
 import os
 import pandas as pd
@@ -12,6 +13,7 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.model_selection import KFold, cross_val_score, train_test_split
 from sklearn.ensemble import RandomForestRegressor,  GradientBoostingRegressor
+from sklearn.base import clone
 import xgboost as xgb
 import lightgbm as lgb
 
@@ -22,76 +24,97 @@ from utils.Training import *
 from utils.Variants import *
 from utils.AveragingModels import *
 
+
+np.random.seed(int(time.time()))
+
+
+def seed():
+    return np.random.randint(2**32-1)
+
+
+fit_intercept = True
+
 t = training()
-t.verbose = True
-t.explode_possible_types_columns = True
-
-train_variants = [['OverallQual', 'target_mean'], ['TotalSF', 'none'], ['Neighborhood', 'one_hot'], ['OverallCond', 'label_encoding'], ['BsmtFinType1', 'one_hot'], ['GarageCars', 'none'], ['MSSubClass', 'one_hot'], ['LotArea', 'none'], ['YearBuilt', 'none'], ['MSZoning', 'one_hot'], ['BsmtFinSF1', 'none'], ['SaleCondition', 'target_mean'], ['2ndFlrSF', 'extract_0'], ['KitchenQual', 'one_hot'], ['BsmtExposure', 'one_hot'], ['Functional', 'target_mean'], ['GrLivArea', 'none'], ['Condition1', 'one_hot'], ['HeatingQC', 'target_mean'], ['Fireplaces', 'none'], ['ScreenPorch', 'extract_0'], ['BsmtFullBath', 'none'], ['BsmtQual', 'one_hot'], ['CentralAir', 'label_encoding'], ['YearRemodAdd', 'none'], ['PoolArea', 'none'], [
-    'Heating', 'one_hot'], ['RoofMatl', 'target_mean'], ['Foundation', 'target_mean'], ['GarageCond', 'target_mean'], ['HalfBath', 'extract_0'], ['FullBath', 'extract_0'], ['KitchenAbvGr', 'none'], ['LotConfig', 'one_hot'], ['ExterQual', 'label_encoding'], ['Exterior1st', 'label_encoding'], ['WoodDeckSF', 'extract_0'], ['Exterior2nd', 'label_encoding'], ['GarageQual', 'one_hot'], ['BsmtFinSF2', 'extract_0'], ['LotFrontage', 'extract_0'], ['HouseStyle', 'target_mean'], ['1stFlrSF', 'none'], ['MiscVal', 'extract_0'], ['GarageArea', 'extract_0'], ['ExterCond', 'label_encoding'], ['MasVnrArea', 'none'], ['MasVnrType', 'label_encoding'], ['MoSold_categorical', 'target_mean'], ['TotalBsmtSF', 'none'], ['BsmtHalfBath', 'none']]
-
-t.prepare()
-
-variants = Variants(t)
-variants.apply_variants(t, train_variants)
-
-t.do_scale()
-
-lasso = make_pipeline(RobustScaler(), Lasso(alpha=0.0005, random_state=1))
-KRR = KernelRidge(alpha=0.6, kernel='polynomial', degree=2, coef0=2.5)
-ENet = make_pipeline(RobustScaler(), ElasticNet(
-    alpha=0.0005, l1_ratio=.9, random_state=3))
-
-GBoost = GradientBoostingRegressor(n_estimators=3000, learning_rate=0.05,
-                                   max_depth=4, max_features='sqrt',
-                                   min_samples_leaf=15, min_samples_split=10,
-                                   loss='huber', random_state=5)
-
-model_xgb = xgb.XGBRegressor(colsample_bytree=0.4603, gamma=0.0468,
-                             learning_rate=0.05, max_depth=3,
-                             min_child_weight=1.7817, n_estimators=2200,
-                             reg_alpha=0.4640, reg_lambda=0.8571,
-                             subsample=0.5213, silent=1,
-                             random_state=7, nthread=-1)
-
-model_lgb = lgb.LGBMRegressor(objective='regression', num_leaves=5,
-                              learning_rate=0.05, n_estimators=720,
-                              max_bin=55, bagging_fraction=0.8,
-                              bagging_freq=5, feature_fraction=0.2319,
-                              feature_fraction_seed=9, bagging_seed=9,
-                              min_data_in_leaf=6, min_sum_hessian_in_leaf=11)
-
-
-m = AveragingModels(models=(ENet,  KRR, lasso, GBoost, model_xgb, model_lgb))
-
-rmse_score = custom_score_using_kfolds(
-    m.fit,
-    m.predict,
-    rmse,
-    np.array(t.df_train),
-    np.array(t.labels.values),
-    scale=False,
-    doShuffle=True)
-
-print 'KFold RMSE:', rmse_score
+t.explode_columns_possibilities()
 
 if False:
-    cod_score = custom_score_using_kfolds(
-        m.fit,
-        m.predict,
-        cod,
-        np.array(t.df_train.values),
-        np.array(t.labels.values),
-        scale=True,
-        doShuffle=True)
+    train_variants =[['TotalSF', 'linearize_order_2'], ['OverallQual', 'target_mean'], ['Neighborhood', 'one_hot'], ['OverallCond', 'one_hot'], ['BsmtUnfSF', 'quantile_bin(5)'], ['GarageYrBlt', 'quantile_bin(10)'], ['LotArea', 'linearize_order_3'], ['Age', 'extract_0'], ['MSZoning', 'one_hot'], ['FireplaceQu', 'target_mean'], ['GarageCars', 'none'], ['Condition1', 'target_mean'], ['SaleCondition', 'one_hot'], ['KitchenQual', 'one_hot'], ['Functional', 'target_median'], ['YearBuilt', 'linearize_order_2'], ['CentralAir', 'target_mean'], ['GrLivArea', 'extract_0_linearize_order_2'], ['BsmtExposure', 'one_hot']]
+    train_cols = [v[0] for v in train_variants]
+    t.retain_columns(train_cols)
+    variants = Variants(t, verbose=True)
+    variants.apply_variants(t, train_variants)
+else:
+    t.dummify_all_categoricals()
 
-    print 'COD:', cod_score
+t.ready_for_takeoff()
+t.scale()
+if not fit_intercept:
+    t.scale_target()
+t.shuffle()
+t.remove_columns_with_unique_value()
+t.sanity()
+t.summary()
+# t.save('../tmp')
 
+
+def new_model():
+    lasso = Lasso(alpha=0.0005, random_state=seed())
+    KRR = KernelRidge(alpha=0.6, kernel='polynomial', degree=2, coef0=2.5)
+    ENet = ElasticNet(alpha=0.0005, l1_ratio=.9, random_state=seed())
+
+    GBoost = GradientBoostingRegressor(n_estimators=3000, learning_rate=0.05,
+                                       max_depth=4, max_features='sqrt',
+                                       min_samples_leaf=15, min_samples_split=10,
+                                       loss='huber', random_state=seed())
+
+    model_xgb = xgb.XGBRegressor(colsample_bytree=0.4603, gamma=0.0468,
+                                 learning_rate=0.05, max_depth=3,
+                                 min_child_weight=1.7817, n_estimators=2200,
+                                 reg_alpha=0.4640, reg_lambda=0.8571,
+                                 subsample=0.5213, silent=1,
+                                 random_state=7, nthread=-1)
+
+    model_lgb = lgb.LGBMRegressor(objective='regression', num_leaves=5,
+                                  learning_rate=0.05, n_estimators=720,
+                                  max_bin=55, bagging_fraction=0.8,
+                                  bagging_freq=5, feature_fraction=0.2319,
+                                  feature_fraction_seed=seed(), bagging_seed=seed(),
+                                  min_data_in_leaf=6, min_sum_hessian_in_leaf=11)
+
+    return AveragingModels(models=(ENet,  KRR, lasso, GBoost, model_xgb, model_lgb))
+    # return lasso
+
+
+m = new_model()
+
+X = t.df_train.values
+y = t.labels.values
+
+X, y = shuffle(X, y)
+
+if False:
+    left_out = 500
+    X1 = X[:-left_out]
+    y1 = y[:-left_out]
+    X2 = X[left_out:]
+    y2 = y[left_out:]
+
+    m = new_model()
+    m.fit(X1, y1)
+    predicted = m.predict(X2)
+    print 'RMSE unseen data (', left_out, '):', rmse(predicted, y2)
+    np.savetxt('test_predicted.csv', predicted, fmt='%f')
+    np.savetxt('test_actual.csv', y2, fmt='%f')
+
+m = new_model()
+m.fit(X, y)
 
 # Predictions
 df_predicted = pd.DataFrame(columns=['Id', 'SalePrice'])
 df_predicted['Id'] = t.test_ids
 df_predicted.set_index('Id')
-df_predicted['SalePrice'] = np.exp(m.predict(t.df_test))
+predicted = m.predict(t.df_test.values)
+df_predicted['SalePrice'] = t.untransform_target(predicted)
 df_predicted.to_csv('predicted.csv', sep=',', index=False)
 
 print 'predictions done.'

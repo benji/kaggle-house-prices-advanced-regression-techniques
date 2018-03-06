@@ -1,4 +1,5 @@
 import math
+import time
 import json
 import sys
 import os
@@ -26,15 +27,47 @@ from utils.Variants import *
 from utils.AveragingModels import *
 
 
-lasso = make_pipeline(RobustScaler(), Lasso(alpha=0.001, random_state=1))
-ENet = make_pipeline(RobustScaler(), ElasticNet(
-    alpha=0.0005, l1_ratio=.9, random_state=3))
+np.random.seed(int(time.time()))
+
+
+def seed():
+    return np.random.randint(2**32-1)
+
+
+fit_intercept = True
+
+t = training()
+t.explode_columns_possibilities()
+
+if False:
+    train_variants = [['TotalSF', 'linearize_order_2'], ['OverallQual', 'target_mean'], ['Neighborhood', 'one_hot'], ['OverallCond_numerical', 'none'], ['BsmtUnfSF', 'quantile_bin(10)'], ['Age', 'quantile_bin(20)'], ['LotArea', 'extract_0_linearize_order_2'], ['GarageCars_categorical', 'label_encoding'], ['MSZoning', 'one_hot'], ['Fireplaces', 'linearize_order_3'], ['Condition1', 'one_hot'], ['Functional', 'label_encoding'], ['SaleCondition', 'target_median'], [
+        'CentralAir', 'target_mean'], ['KitchenQual', 'one_hot'], ['GrLivArea', 'extract_0_linearize_order_2'], ['BsmtExposure', 'one_hot'], ['YearBuilt', 'none'], ['KitchenAbvGr_categorical', 'label_encoding'], ['YearsSinceRemodel', 'extract_0_linearize_order_2'], ['HeatingQC', 'target_median'], ['ScreenPorch', 'linearize_order_2'], ['RoofMatl', 'label_encoding'], ['GarageArea', 'linearize_order_3'], ['GarageQual', 'target_median']]
+    train_cols = [v[0] for v in train_variants]
+    t.retain_columns(train_cols)
+    variants = Variants(t, verbose=True)
+    variants.apply_variants(t, train_variants)
+else:
+    t.dummify_all_categoricals()
+
+t.ready_for_takeoff()
+t.scale()
+if not fit_intercept:
+    t.scale_target()
+t.shuffle()
+t.remove_columns_with_unique_value()
+t.sanity()
+t.summary()
+# t.save('../tmp')
+
+
+lasso = Lasso(alpha=0.0005, random_state=seed())
 KRR = KernelRidge(alpha=0.6, kernel='polynomial', degree=2, coef0=2.5)
+ENet = ElasticNet(alpha=0.0005, l1_ratio=.9, random_state=seed())
 
 GBoost = GradientBoostingRegressor(n_estimators=3000, learning_rate=0.05,
                                    max_depth=4, max_features='sqrt',
                                    min_samples_leaf=15, min_samples_split=10,
-                                   loss='huber', random_state=5)
+                                   loss='huber', random_state=seed())
 
 model_xgb = xgb.XGBRegressor(colsample_bytree=0.4603, gamma=0.0468,
                              learning_rate=0.05, max_depth=3,
@@ -47,30 +80,12 @@ model_lgb = lgb.LGBMRegressor(objective='regression', num_leaves=5,
                               learning_rate=0.05, n_estimators=720,
                               max_bin=55, bagging_fraction=0.8,
                               bagging_freq=5, feature_fraction=0.2319,
-                              feature_fraction_seed=9, bagging_seed=9,
+                              feature_fraction_seed=seed(), bagging_seed=seed(),
                               min_data_in_leaf=6, min_sum_hessian_in_leaf=11)
 
 
 models = [lasso, ENet, KRR, GBoost, model_xgb, model_lgb]
 stacked_model = clone(model_lgb)
-
-t = training()
-t.explode_columns_possibilities()
-
-train_variants = [['OverallQual_numerical', 'extract_0_linearize_order_2'], ['TotalSF', 'linearize_order_3'], ['MSZoning', 'target_median'], ['YearRemodAdd', 'linearize_order_3'], ['OverallCond', 'one_hot'], ['GarageCars_categorical', 'label_encoding'], ['BsmtUnfSF', 'quantile_bin(5)'], ['Fireplaces_categorical', 'target_median'], ['Neighborhood', 'target_median'], ['SaleType', 'target_median'], ['Heating', 'target_mean'], ['GarageArea', 'quantile_bin(5)'], ['BsmtFullBath', 'none'], ['FullBath_categorical', 'one_hot'], ['Electrical', 'label_encoding'], ['YearBuilt', 'extract_0_linearize_order_2'], ['GarageFinish', 'target_median'], ['LotArea', 'quantile_bin(5)'], ['BsmtFinType1', 'label_encoding'], ['FullBath', 'extract_0_linearize_order_2'], ['LowQualFinSF', 'extract_0_linearize_order_2'], ['YrSold', 'none'], ['ScreenPorch', 'linearize_order_2'], ['BsmtFinType2', 'target_median'], ['TotRmsAbvGrd_categorical', 'target_mean'], ['HalfBath', 'extract_0_linearize_order_2'], ['SaleCondition', 'target_mean'], ['BedroomAbvGr', 'linearize_order_2'], ['HeatingQC', 'target_mean'], ['GarageYrBlt', 'quantile_bin(5)'], [
-    'CentralAir', 'target_median'], ['RoofStyle', 'target_median'], ['LandContour', 'target_median'], ['BsmtQual', 'one_hot'], ['BsmtCond', 'one_hot'], ['MiscFeature', 'label_encoding'], ['TotRmsAbvGrd', 'linearize_order_3'], ['BsmtFullBath_categorical', 'one_hot'], ['GarageCars', 'linearize_order_2'], ['3SsnPorch', 'extract_0_linearize_order_2'], ['Condition1', 'target_mean'], ['KitchenAbvGr_categorical', 'target_mean'], ['RecentRemodel', 'none'], ['WoodDeckSF', 'none'], ['PavedDrive', 'target_median'], ['2ndFlrSF', 'extract_0_linearize_order_2'], ['DateSold', 'quantile_bin(5)'], ['KitchenAbvGr', 'linearize_order_2'], ['HouseStyle', 'label_encoding'], ['Street', 'target_median'], ['EnclosedPorch', 'none'], ['Age', 'extract_0'], ['GarageCond', 'target_median'], ['BedroomAbvGr_categorical', 'target_median'], ['TotalBsmtSF', 'quantile_bin(5)'], ['TimeSinceSold', 'linearize_order_2'], ['GrLivArea', 'linearize_order_2'], ['MoSold_categorical', 'label_encoding'], ['BsmtExposure', 'target_mean'], ['Remodeled', 'extract_0'], ['MasVnrArea', 'linearize_order_2'], ['OpenPorchSF', 'linearize_order_3']]
-
-variants = Variants(t, verbose=True)
-
-t.retain_columns([v[0] for v in train_variants])
-variants.apply_variants(t, train_variants)
-
-t.verify_all_columns_are_numerical()
-
-t.shuffle()
-t.scale()
-t.health_check()
-t.summary()
 
 holdout = 0
 
@@ -110,30 +125,22 @@ for m in models:
 
 print 'Completed out of folds predictions.'
 
-stacked_train_shuffled, y_shuffled = shuffle(stacked_train.values, y)
-
-scaler = StandardScaler()
-scaler.fit(stacked_train_shuffled)
-stacked_train_shuffled_scaled = scaler.transform(stacked_train_shuffled)
+stacked_train = stacked_train.values
 
 stacked_model_score = clone(stacked_model)
 score = score_using_test_ratio(
-    stacked_model_score.fit, stacked_model_score.predict, rmse, stacked_train_shuffled_scaled, y_shuffled, test_ratio=.15)
-print 'Stacked model RMSE:', score
+    stacked_model_score.fit, stacked_model_score.predict, rmse, stacked_train, y, test_ratio=.4)
+print 'Stacked model RMSE with test ratio:', score
 
 
 print "Fitting on whole dataset for predictions..."
 stacked_model_pred = clone(stacked_model)
 
 print 'train stacked model for pred against:'
-print stacked_train[:5]
-stacked_model_pred.fit(stacked_train_shuffled_scaled, y_shuffled)
+stacked_model_pred.fit(stacked_train, y)
 
-
-# test
-print 'score test', rmse(stacked_model_pred.predict(
-    stacked_train_shuffled_scaled), y_shuffled)
-
+print 'score test on itself', rmse(
+    stacked_model_pred.predict(stacked_train), y)
 
 print "Producing out of folds predictions for test data"
 stacked_test = pd.DataFrame()
@@ -154,19 +161,20 @@ for m in models:
 
 if holdout > 0:
     print stacked_validation.head()
-    stacked_validation = scaler.transform(stacked_validation.values)
+    stacked_validation = stacked_validation.values
 
     y_validation_predicted = stacked_model_pred.predict(stacked_validation)
     print y_validation_predicted[:5]
     print y_validation[:5]
     print "Validation RMSE:", rmse(y_validation_predicted, y_validation)
 
-stacked_test = scaler.transform(stacked_test.values)
+stacked_test = stacked_test.values
 
 df_predicted = pd.DataFrame(columns=['Id', 'SalePrice'])
 df_predicted['Id'] = t.test_ids
 df_predicted.set_index('Id')
-df_predicted['SalePrice'] = np.expm1(stacked_model_pred.predict(stacked_test))
+predicted = stacked_model_pred.predict(stacked_test)
+df_predicted['SalePrice'] = t.untransform_target(predicted)
 df_predicted.to_csv('predicted.csv', sep=',', index=False)
 
 print 'predictions done.'

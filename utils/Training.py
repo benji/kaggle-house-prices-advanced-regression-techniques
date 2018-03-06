@@ -20,6 +20,12 @@ from utils import *
 class Training:
 
     def __init__(self, df_train=None, df_test=None, schema=None):
+        self.verbose = True
+
+        # private stuff
+        self.y_restore_transforms = []
+        self.target_scaler = None
+
         if df_train is None:
             return
 
@@ -39,8 +45,6 @@ class Training:
         self.categoricals_as_string()
 
         self.health_check()
-
-        self.verbose = True
 
     ######### TOOLS ##########
 
@@ -172,6 +176,12 @@ class Training:
             if np.isnan(np.sum(self.df_test.values)):
                 raise Exception('Found NANs!')
 
+        for df in [self.df_train, self.df_test]:
+            if self.targetcol in df.columns:
+                raise Exception('Target column found in dataframe')
+            if self.idcol in df.columns:
+                raise Exception('Target column found in dataframe')
+
     def hasnan(self, df):
         return np.isnan(np.sum(df.values))
 
@@ -225,20 +235,6 @@ class Training:
         for df in [self.df_train, self.df_test]:
             print 'check'
             for c in df.columns:
-                tmp = df[c][df[c] > 100000]
-                if tmp.shape[0] > 0:
-                    print tmp.head()
-                    if throw:
-                        raise Exception('Found bad value')
-                    else:
-                        return False
-                tmp = df[c][df[c] < -100000]
-                if tmp.shape[0] > 0:
-                    print tmp.head()
-                    if throw:
-                        raise Exception('Found bad value')
-                    else:
-                        return False
                 tmp = df[c][df[c].isnull()]
                 if tmp.shape[0] > 0:
                     print tmp.head()
@@ -262,6 +258,21 @@ class Training:
         s = self.df_train.shape
         print 'Training data has ', s[1], 'columns and', s[0], 'observations.'
         print 'Columns:', self.df_train.columns
+
+    def sanitize_column_name(self, c):
+        '''
+        Mostly for XGBoost:
+        ValueError: feature_names may not contain [, ] or <
+        '''
+        c = c.replace('[', '_')
+        c = c.replace(']', '_')
+        c = c.replace('<', '_')
+        return c
+
+    def sanitize_column_names(self):
+        newcols = [self.sanitize_column_name(c) for c in self.df_train.columns]
+        self.df_train.columns = newcols
+        self.df_test.columns = newcols
 
     ##### TRANSFORMATIONS #####
 
@@ -294,7 +305,8 @@ class Training:
     ###### ADD / REMOVE COLUMNS / ROWS #####
 
     def duplicate_column(self, c, newcol):
-        print 'Creating new column', newcol
+        if self.verbose:
+            print 'Creating new column', newcol
         self.df_train[newcol] = self.df_train[c]
         if self.df_test is not None:
             self.df_test[newcol] = self.df_test[c]
@@ -318,12 +330,14 @@ class Training:
         self.retain_columns_df(self.df_train, columns)
         if self.df_test is not None:
             self.retain_columns_df(self.df_test, columns)
-        print 'Retained', len(self.df_train.columns), 'columns in dataframe'
+        if self.verbose:
+            print 'Retained', len(
+                self.df_train.columns), 'columns in dataframe'
 
     def drop_column(self, col):
         if col in self.df_train.columns:
             if self.verbose:
-                print 'Dropping', col
+                print 'Dropping column', col
             self.df_train = self.df_train.drop([col], axis=1)
             self.df_test = self.df_test.drop([col], axis=1)
 
@@ -337,15 +351,21 @@ class Training:
         self.drop_row_by_index(idx)
 
     def drop_row_by_index(self, idx):
-        if self.verbose:
-                print 'dropping training row at index', idx
-        self.df_train.drop(idx, inplace=True)
-        self.train_ids.drop(idx, inplace=True)
-        self.labels.drop(idx, inplace=True)
+        indexes = self.df_train.index.values
+        if idx in indexes:
+            if self.verbose:
+                print 'Dropping training row at index', idx
+            self.df_train.drop(idx, inplace=True)
+            self.train_ids.drop(idx, inplace=True)
+            self.labels.drop(idx, inplace=True)
 
     def drop_rows_by_indexes(self, arr):
         for i in arr:
             self.drop_row_by_index(i)
+
+    def remove_categoricals(self):
+        for c in self.categorical_columns():
+            self.drop_column(c)
 
     ####### MISSING VALUES #######
 
@@ -447,10 +467,33 @@ class Training:
         self.df_train[columns] = scaler.transform(self.df_train[columns])
         self.df_test[columns] = scaler.transform(self.df_test[columns])
 
+    def unscale_target(self,  values):
+        if self.target_scaler is None:
+            return values
+        reshaped = np.reshape(values, (-1, 1))
+        unscaled = self.target_scaler.inverse_transform(reshaped)
+        return np.reshape(unscaled, (-1))
+
+    def scale_target(self):
+        self.target_scaler = StandardScaler()
+        reshaped = np.reshape(self.labels.values, (-1, 1))
+        self.target_scaler.fit(reshaped)
+        scaled = self.target_scaler.transform(reshaped)
+        reshaped = np.reshape(scaled, (-1))
+        self.labels[:] = reshaped
+        self.y_restore_transforms.append(
+            lambda y: self.unscale_target(y))
+
+    def untransform_target(self, predicted):
+        for f in reversed(self.y_restore_transforms):
+            predicted = f(predicted)
+        return predicted
+
     def normalize_column_log1p(self, col):
         if col == self.targetcol:
             print 'Normalizing labels column', col
             self.labels = np.log1p(self.labels)
+            self.y_restore_transforms.append(lambda y: np.expm1(y))
         else:
             print 'Normalizing training column', col
             self.df_train[col] = np.log1p(self.df_train[col])
@@ -719,14 +762,14 @@ class Training:
         print test[test['bonf(p)'] < 0.5]
         sorted = test[test['bonf(p)'] < 0.5].sort_values('bonf(p)')
         print sorted.index
-        
+
         for i in sorted.index:
             self.drop_row_by_index(i)
 
     def autoremove_ouliers(self):
         outlier_test = self.compute_outliers()
         bonf_test = outliers_test['bonf(p)']
-        bonf_outliers = list(bonf_test[bonf_test<1e-3].index)
+        bonf_outliers = list(bonf_test[bonf_test < 1e-3].index)
 
         for i in bonf_outliers:
             self.drop_row_by_index(i)
@@ -736,9 +779,7 @@ class Training:
         print 'Computing outliers...'
         x = self.df_train
         y = self.labels
-        model = smapi.OLS(y,x)
+        model = smapi.OLS(y, x)
         results = model.fit()
         outliers_test = results.outlier_test().sort_values('bonf(p)')
         return outliers_test
-
-    
