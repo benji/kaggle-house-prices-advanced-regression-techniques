@@ -1,0 +1,100 @@
+== Special ==
+Id
+SalePrice
+
+== Surface ==
+LotArea       # Lot size
+
+1stFlrSF
+2ndFlrSF
+
+TotalBsmtSF   # basement 
+BsmtFinSF2    # basement
+BsmtUnfSF     # basement
+BsmtFinSF1    # basement
+
+WoodDeckSF    # porch SF
+OpenPorchSF   # porch SF
+3SsnPorch     # porch SF
+ScreenPorch   # porch SF
+EnclosedPorch # porch SF
+
+GarageArea    # Size of garage in square feet
+
+GrLivArea     # Above grade (ground) living area square feet
+PoolArea
+MasVnrArea    # Masonry veneer area in square feet
+LowQualFinSF
+
+== Date / Time ==
+YearBuilt
+YearRemodAdd
+MoSold
+YrSold
+GarageYrBlt
+
+== Rooms ==
+BsmtFullBath
+BsmtHalfBath
+FullBath
+HalfBath
+BedroomAbvGr
+KitchenAbvGr
+TotRmsAbvGrd
+
+== Qual / Cond ==
+OverallQual
+OverallCond
+ExterQual
+ExterCond
+PoolQC
+BsmtQual
+BsmtCond
+GarageQual
+GarageCond
+KitchenQual
+FireplaceQu
+HeatingQC
+
+== other numerical ==
+LotFrontage (Linear feet of street)
+Fireplaces
+GarageCars
+MiscVal
+
+== other categorical ==
+MSSubClass
+MSZoning
+Street
+Alley
+LotShape
+LandContour
+Utilities
+LotConfig
+LandSlope
+Neighborhood
+Condition1
+Condition2
+BldgType
+HouseStyle
+RoofStyle
+RoofMatl
+Exterior1st
+Exterior2nd
+MasVnrType
+Foundation
+BsmtExposure
+BsmtFinType1
+BsmtFinType2
+Heating
+CentralAir
+Electrical
+Functional
+GarageType
+GarageFinish
+PavedDrive
+Fence
+MiscFeature
+SaleType
+SaleCondition
+

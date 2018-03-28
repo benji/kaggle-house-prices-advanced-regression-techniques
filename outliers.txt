@@ -1,0 +1,150 @@
+-------------
+outlier: (632, 0.708261342120796) id: 633
+SalePrice Actual: 11.3205656935 Predicted: 12.0288270356 diff 0.708261342120796
+Family WD
+row idx 632 stats for NUMERIC columns:
+row idx 632 stats for CATEGORICAL columns:
+Column SaleCondition = Family matches 1 % of the train set ( 20 )
+
+  020	1-STORY 1946 & NEWER ALL STYLES
+  RL	Residential Low Density
+  85x140 ft lot
+  NWAmes
+  2ba/3br
+  SaleCondition Family 
+
+True outlier, the only thing fishy is the SaleCondition.
+Maybe a family member made a deal with someone to have a very low price.
+We can't detect those, there are 20 in the train set and most of them are pretty regular.
+We can't distinguish the good ones from the bad.
+The bad news is that the test set has 26 of them, no way to really know which one are bad, if any.
+
+-------------
+
+outlier: (523, 0.6930026689914008) id: 524
+SalePrice Actual: 12.1267642515 Predicted: 12.8197669205 diff 0.6930026689914008
+Partial New
+row idx 523 stats for NUMERIC columns:
+Column LotFrontage = 130.0 is in the top 1 % of the train set ( 21 )
+Column LotArea = 40094.0 is in the top 0 % of the train set ( 14 )
+Column OverallQual = 10.0 is in the top 1 % of the train set ( 18 )
+Column YearRemodAdd = 2008.0 is in the top 4 % of the train set ( 69 )
+Column MasVnrArea = 762.0 is in the top 1 % of the train set ( 20 )
+Column ExterQual = 4.0 is in the top 3 % of the train set ( 52 )
+Column BsmtFinSF1 = 2260.0 is in the top 0 % of the train set ( 2 )
+Column TotalBsmtSF = 3138.0 is in the top 0 % of the train set ( 4 )
+Column 1stFlrSF = 3138.0 is in the top 0 % of the train set ( 3 )
+Column 2ndFlrSF = 1538.0 is in the top 0 % of the train set ( 8 )
+Column GrLivArea = 4676.0 is in the top 0 % of the train set ( 2 )
+Column FullBath = 3.0 is in the top 2 % of the train set ( 33 )
+Column TotRmsAbvGrd = 11.0 is in the top 2 % of the train set ( 30 )
+Column GarageArea = 884.0 is in the top 3 % of the train set ( 46 )
+Column OpenPorchSF = 406.0 is in the top 0 % of the train set ( 5 )
+Column OverallCondXQual = 50.0 is in the top 3 % of the train set ( 50 )
+Column OverallCond+Qual = 15.0 is in the top 3 % of the train set ( 50 )
+Column BsmtFinishedSF = 2260.0 is in the top 0 % of the train set ( 3 )
+Column TotalRooms = 12.0 is in the top 1 % of the train set ( 25 )
+Column BsmtLivingArea = 2260.0 is in the top 0 % of the train set ( 3 )
+Column TotalLivingArea = 6936.0 is in the top 0 % of the train set ( 2 )
+Column HasCondition_PosN = 2 is in the top 0 % of the train set ( 2 )
+Column HasCondition2_PosN = 1 is in the top 1 % of the train set ( 19 )
+Column AgeWhenSold = 0.0 is in the bottom 4 % of the train set ( 64 )
+Column BuiltSoldSameYear = 1 is in the top 4 % of the train set ( 64 )
+Column TotalSF = 7814.0 is in the top 0 % of the train set ( 2 )
+Column TotalSF_with_garage = 7814.0 is in the top 0 % of the train set ( 2 )
+Column TotalPorch = 614.0 is in the top 2 % of the train set ( 30 )
+Column TotalSF_with_garage_porch = 8428.0 is in the top 0 % of the train set ( 2 )
+row idx 523 stats for CATEGORICAL columns:
+Column Exterior2nd = CemntBd matches 4 % of the train set ( 60 )
+Column Exterior1st = CemntBd matches 4 % of the train set ( 61 )
+Column LandContour = Bnk matches 4 % of the train set ( 63 )
+
+Huge property, went for pretty cheap for the space (184k)
+irregular 1, banked, but gentle slope
+Edwards Neighborhood (low)
+2x PosN -> nature?
+RL -> low density Residential
+Partial New
+Built/Sold same year 2007 (remodAdded next year 2008)
+2 porches, big
+
+-------------
+
+outlier: (462, 0.6086908572421539) id: 463
+SalePrice Actual: 11.0410641112 Predicted: 11.6497549685 diff 0.6086908572421539
+Normal WD
+row idx 462 stats for NUMERIC columns:
+Column EnclosedPorch = 236.0 is in the top 2 % of the train set ( 30 )
+Column MoSold = 12.0 is in the top 4 % of the train set ( 59 )
+row idx 462 stats for CATEGORICAL columns:
+Column FireplaceQu = Po matches 1 % of the train set ( 20 )
+Column BsmtFinType2 = BLQ matches 2 % of the train set ( 33 )
+Column Fence = GdWo matches 3 % of the train set ( 54 )
+Column Neighborhood = Sawyer matches 5 % of the train set ( 74 )
+
+Neighorhood Sawyer (lowish)
+SalePrice 62k!
+
+TODO get real AMES dataset and lookup that property on zillow
+PID 05323781203
+https://beacon.schneidercorp.com/Application.aspx?AppID=165&LayerID=2145&PageTypeID=4&PageID=1108&Q=934709509&KeyValue=0532378120
+https://www.zillow.com/homedetails/1313-Garfield-Ave-Ames-IA-50014/93954232_zpid/
+https://beacon.schneidercorp.com/FileData/StoryCountyIA/Photos/Property_Cards/0532378120_1986_2013.pdf
+
+sold in 1998 for 85,000
+sold in 2001 for 92,000
+then in 2009 for 62,383??
+
+-------------
+
+outlier: (1324, 0.6047301156887794) id: 1325
+SalePrice Actual: 11.8981946685 Predicted: 12.5029247841 diff 0.6047301156887794
+Partial New
+row idx 1324 stats for NUMERIC columns:
+Column MasVnrArea = 428.0 is in the top 5 % of the train set ( 86 )
+Column BsmtUnfSF = 1795.0 is in the top 1 % of the train set ( 16 )
+Column TotalBsmtSF = 1795.0 is in the top 4 % of the train set ( 67 )
+Column 1stFlrSF = 1795.0 is in the top 5 % of the train set ( 85 )
+Column GarageArea = 895.0 is in the top 2 % of the train set ( 37 )
+Column BsmtUnfSFPct = 0.999443207127 is in the top 0 % of the train set ( 13 )
+row idx 1324 stats for CATEGORICAL columns:
+Column Neighborhood = Somerst matches 5 % of the train set ( 86 )
+
+partial new are prone to errors?
+Neighorhood Somerst (avg)
+new construction partial new
+but all basement is unfinished? -> seems very common to all types
+2br/2ba
+1 floor 1795 sqft
+
+-------------
+
+outlier: (825, 0.5151215549173571) id: 826
+SalePrice Actual: 12.8610012107 Predicted: 12.3458796558 diff -0.5151215549173571
+Partial New
+row idx 825 stats for NUMERIC columns:
+Column LotFrontage = 114.0 is in the top 3 % of the train set ( 45 )
+Column OverallQual = 10.0 is in the top 1 % of the train set ( 18 )
+Column YearRemodAdd = 2008.0 is in the top 4 % of the train set ( 69 )
+Column MasVnrArea = 816.0 is in the top 0 % of the train set ( 14 )
+Column ExterQual = 4.0 is in the top 3 % of the train set ( 52 )
+Column BsmtFinSF1 = 1636.0 is in the top 0 % of the train set ( 12 )
+Column TotalBsmtSF = 2078.0 is in the top 1 % of the train set ( 22 )
+Column 1stFlrSF = 2084.0 is in the top 1 % of the train set ( 28 )
+Column GarageArea = 1220.0 is in the top 0 % of the train set ( 5 )
+Column OverallCondXQual = 50.0 is in the top 3 % of the train set ( 50 )
+Column OverallCond+Qual = 15.0 is in the top 3 % of the train set ( 50 )
+Column BsmtFinishedSF = 1636.0 is in the top 0 % of the train set ( 14 )
+Column BsmtLivingArea = 1636.0 is in the top 0 % of the train set ( 13 )
+Column TotalLivingArea = 3720.0 is in the top 2 % of the train set ( 30 )
+Column HasCondition_PosN = 2 is in the top 0 % of the train set ( 2 )
+Column HasCondition2_PosN = 1 is in the top 1 % of the train set ( 19 )
+Column TotalSF = 4162.0 is in the top 3 % of the train set ( 49 )
+Column TotalSF_with_garage = 4162.0 is in the top 3 % of the train set ( 54 )
+Column TotalSF_with_garage_porch = 4395.0 is in the top 4 % of the train set ( 64 )
+row idx 825 stats for CATEGORICAL columns:
+Column Exterior2nd = CemntBd matches 4 % of the train set ( 60 )
+Column Exterior1st = CemntBd matches 4 % of the train set ( 61 )
+Column Neighborhood = NridgHt matches 5 % of the train set ( 77 )
+
+

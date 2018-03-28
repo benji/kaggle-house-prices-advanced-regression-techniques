@@ -29,16 +29,24 @@ np.random.seed(int(time.time()))
 
 
 def seed():
-    return np.random.randint(2**32-1)
+    return 1
+#    return np.random.randint(2**32-1)
 
 
 fit_intercept = True
 
-t = training()
+
+t = training(exclude_outliers=True, remove_partials=False)
+t.shuffle(seed=seed())
+
+for idx in [632, 462, 523, 1298]:
+    t.drop_row_by_index(idx)
+
 t.explode_columns_possibilities()
 
 if False:
-    train_variants =[['TotalSF', 'linearize_order_2'], ['OverallQual', 'target_mean'], ['Neighborhood', 'one_hot'], ['OverallCond', 'one_hot'], ['BsmtUnfSF', 'quantile_bin(5)'], ['GarageYrBlt', 'quantile_bin(10)'], ['LotArea', 'linearize_order_3'], ['Age', 'extract_0'], ['MSZoning', 'one_hot'], ['FireplaceQu', 'target_mean'], ['GarageCars', 'none'], ['Condition1', 'target_mean'], ['SaleCondition', 'one_hot'], ['KitchenQual', 'one_hot'], ['Functional', 'target_median'], ['YearBuilt', 'linearize_order_2'], ['CentralAir', 'target_mean'], ['GrLivArea', 'extract_0_linearize_order_2'], ['BsmtExposure', 'one_hot']]
+    train_variants = [['TotalSF', 'linearize_order_2'], ['OverallQual', 'target_mean'], ['Neighborhood', 'one_hot'], ['OverallCond', 'one_hot'], ['BsmtUnfSF', 'quantile_bin(5)'], ['GarageYrBlt', 'quantile_bin(10)'], ['LotArea', 'linearize_order_3'], ['Age', 'extract_0'], ['MSZoning', 'one_hot'], ['FireplaceQu', 'target_mean'], [
+        'GarageCars', 'none'], ['Condition1', 'target_mean'], ['SaleCondition', 'one_hot'], ['KitchenQual', 'one_hot'], ['Functional', 'target_median'], ['YearBuilt', 'linearize_order_2'], ['CentralAir', 'target_mean'], ['GrLivArea', 'extract_0_linearize_order_2'], ['BsmtExposure', 'one_hot']]
     train_cols = [v[0] for v in train_variants]
     t.retain_columns(train_cols)
     variants = Variants(t, verbose=True)
@@ -50,7 +58,7 @@ t.ready_for_takeoff()
 t.scale()
 if not fit_intercept:
     t.scale_target()
-t.shuffle()
+
 t.remove_columns_with_unique_value()
 t.sanity()
 t.summary()
@@ -58,7 +66,8 @@ t.summary()
 
 
 def new_model():
-    lasso = Lasso(alpha=0.0005, random_state=seed())
+    lasso = Lasso(alpha=0.0005, fit_intercept=True,
+                  random_state=seed(), warm_start=False, max_iter=10000)
     KRR = KernelRidge(alpha=0.6, kernel='polynomial', degree=2, coef0=2.5)
     ENet = ElasticNet(alpha=0.0005, l1_ratio=.9, random_state=seed())
 
@@ -72,7 +81,7 @@ def new_model():
                                  min_child_weight=1.7817, n_estimators=2200,
                                  reg_alpha=0.4640, reg_lambda=0.8571,
                                  subsample=0.5213, silent=1,
-                                 random_state=7, nthread=-1)
+                                 random_state=seed(), nthread=-1)
 
     model_lgb = lgb.LGBMRegressor(objective='regression', num_leaves=5,
                                   learning_rate=0.05, n_estimators=720,
@@ -90,9 +99,9 @@ m = new_model()
 X = t.df_train.values
 y = t.labels.values
 
-X, y = shuffle(X, y)
+#X, y = shuffle(X, y)
 
-if False:
+if True:
     left_out = 500
     X1 = X[:-left_out]
     y1 = y[:-left_out]
@@ -101,8 +110,10 @@ if False:
 
     m = new_model()
     m.fit(X1, y1)
-    predicted = m.predict(X2)
+    weights = [1,2,1,3,4,3]
+    predicted = m.predict(X2,weights=weights)
     print 'RMSE unseen data (', left_out, '):', rmse(predicted, y2)
+    sys.exit(0)
     np.savetxt('test_predicted.csv', predicted, fmt='%f')
     np.savetxt('test_actual.csv', y2, fmt='%f')
 
@@ -113,8 +124,17 @@ m.fit(X, y)
 df_predicted = pd.DataFrame(columns=['Id', 'SalePrice'])
 df_predicted['Id'] = t.test_ids
 df_predicted.set_index('Id')
-predicted = m.predict(t.df_test.values)
-df_predicted['SalePrice'] = t.untransform_target(predicted)
-df_predicted.to_csv('predicted.csv', sep=',', index=False)
+
+if True:
+    predicted = m.predict(t.df_test.values, [2,2,1,3,4,3])
+    df_predicted['SalePrice'] = t.untransform_target(predicted)
+    df_predicted.to_csv('predicted.csv', sep=',', index=False)
+else:
+    for i in range(6):
+        weights = [1,2,1,3,4,3]
+        weights[i] = weights[i] + 1
+        predicted = m.predict(t.df_test.values, weights)
+        df_predicted['SalePrice'] = t.untransform_target(predicted)
+        df_predicted.to_csv('predicted{}.csv'.format(i), sep=',', index=False)
 
 print 'predictions done.'

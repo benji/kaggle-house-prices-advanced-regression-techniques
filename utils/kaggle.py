@@ -34,48 +34,36 @@ def seed():
     return np.random.randint(2**32-1)
 
 
-def training():
+def training(exclude_outliers=True,remove_partials=False):
 
     df_train = pd.read_csv('../data/train.csv')
     df_test = pd.read_csv('../data/test.csv')
     schema = yaml.safe_load(open('../schema.yaml', 'r').read())
 
-    t = Training(df_train, df_test, schema=schema)
+    if remove_partials:
+        print '!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EXCLUDE PARTIALS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+        df_train = df_train[df_train['SaleCondition'] != 'Partial']
 
-    return kaggle_default_configure(t)
-
-
-def training_train_test_holdout(holdout=300):
-
-    for i in range(50):
-        print 'WWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAA'
-
-    df_train = shuffle(pd.read_csv('../data/train.csv'), random_state=seed())
-
-    df_test = df_train[-holdout:].copy()
-    print df_test.head()
-
-    test_labels = df_test['SalePrice'].copy()
-    df_test.drop(['SalePrice'], axis=1, inplace=True)
-
-    df_train = df_train[:-holdout].copy()
-
-    #df_test = pd.read_csv('../data/test.csv')
-    schema = yaml.safe_load(open('../schema.yaml', 'r').read())
 
     t = Training(df_train, df_test, schema=schema)
-    t.test_labels = test_labels
-    t.y2_labels = t.labels.values[-holdout:].copy()
+    #t.strict_check = False
 
-    return kaggle_default_configure(t)
+    return kaggle_default_configure(t, exclude_outliers=exclude_outliers,remove_partials=remove_partials)
 
 
-def kaggle_default_configure(t):
+def kaggle_default_configure(t, exclude_outliers=True,remove_partials=False):
 
     # REMOVE A FEW OULIERS
 
-    for i in [88, 462, 523, 588, 632, 968, 1298, 1324]:
-        t.drop_row_by_index(i)
+    #if exclude_outliers:
+    #    print '!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EXCLUDE OUTLIERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+        #t.drop_row_by_index(632)
+        #for i in [88, 462, 523, 588, 968, 1298, 1324]:
+        #    t.drop_row_by_index(i)
+        #for i in [632,523,462,1324,968,970]:
+        #    t.drop_row_by_index(i)
+
+            
 
     # for i in [30, 964, 409, 493, 683, 1445, 1424, 869, 706]:
     #    t.drop_row_by_index(i)
@@ -129,6 +117,16 @@ def kaggle_default_configure(t):
     t.fill_na_column('MSSubClass', 'None')
     t.fill_na_column('MiscFeature', 'None')
 
+    t.convert_categorical_column_to_numerical('OverallQual')
+    t.convert_categorical_column_to_numerical('OverallCond')
+    t.label_encode_column('ExterQual')
+    t.label_encode_column('ExterCond')
+    t.label_encode_column('GarageQual')
+    t.label_encode_column('GarageCond')
+    t.label_encode_column('BsmtQual')
+    t.label_encode_column('BsmtCond')
+    # t.label_encode_column('KitchenQual')
+
     def transform_df(df):
         # NA
         df['BsmtUnfSF'][df['BsmtQual'].isnull()] = 0
@@ -141,33 +139,92 @@ def kaggle_default_configure(t):
         df["LotFrontage"].fillna(0, inplace=True)
 
         # ADD CUSTOM FEATURES
+        df['IsMSSubClassPUD'] = (df['MSSubClass'] == '120')*1 + \
+            (df['MSSubClass'] == '150')*1 + (df['MSSubClass'] == '160')*1 + \
+            (df['MSSubClass'] == '180')*1
 
-        #df["Age"] = 2010 - df["YearBuilt"]
-        #t.schema['columns']['Age'] = {'type': 'NUMERIC'}
+        # 120	1-STORY PUD (Planned Unit Development) - 1946 & NEWER
+        # 150	1-1/2 STORY PUD - ALL AGES
+        # 160	2-STORY PUD - 1946 & NEWER
+        # 180	PUD - MULTILEVEL - INCL SPLIT LEV/FOYER
 
-        df["YearsSinceRemodel"] = df["YrSold"] - df["YearRemodAdd"]
-        t.schema['columns']['YearsSinceRemodel'] = {'type': 'NUMERIC'}
-
-        #df["TimeSinceSold"] = 2010 - df["YrSold"]
-        #t.schema['columns']['TimeSinceSold'] = {'type': 'NUMERIC'}
-
-        df["Remodeled"] = (df["YearRemodAdd"] != df["YearBuilt"]) * 1
-        t.schema['columns']['Remodeled'] = {'type': 'NUMERIC'}
-
-        df["RecentRemodel"] = (df["YearRemodAdd"] == df["YrSold"]) * 1
-        t.schema['columns']['RecentRemodel'] = {'type': 'NUMERIC'}
-
-        df["VeryNewHouse"] = (df["YearBuilt"] == df["YrSold"]) * 1
-        t.schema['columns']['VeryNewHouse'] = {'type': 'NUMERIC'}
+        for cq in ['Overall', 'Bsmt', 'Exter', 'Garage']:
+            df[cq+'CondXQual'] = df[cq+'Cond'] * df[cq+'Qual']
+            df[cq+'Cond+Qual'] = df[cq+'Cond'] + df[cq+'Qual']
 
         df['DateSold'] = df['YrSold'] + df['MoSold'] / 12.0
-        t.schema['columns']['DateSold'] = {'type': 'NUMERIC'}
+
+        df['BsmtFinishedSF'] = df['TotalBsmtSF']-df['BsmtUnfSF']
+        df['BsmtUnfSFPct'] = df['BsmtUnfSF']/(1+df['TotalBsmtSF'])
+
+        df['IsBsmtType1Living'] = (df['BsmtFinType1'] == 'GLQ')*1 + \
+            (df['BsmtFinType1'] == 'ALQ')*1 + (df['BsmtFinType1'] == 'BLQ')*1 + \
+            (df['BsmtFinType1'] == 'Rec')*1
+        df['IsBsmtType2Living'] = (df['BsmtFinType2'] == 'GLQ')*1 + \
+            (df['BsmtFinType2'] == 'ALQ')*1 + (df['BsmtFinType2'] == 'BLQ')*1 + \
+            (df['BsmtFinType2'] == 'Rec')*1
+
+        df['TotalRooms'] = df['TotRmsAbvGrd'] + \
+            df['IsBsmtType1Living']+df['IsBsmtType2Living']
+
+        df['BsmtLivingArea'] = df['BsmtFinSF1']*df['IsBsmtType1Living'] + \
+            df['BsmtFinSF2']*df['IsBsmtType2Living']
+        df['TotalLivingArea'] = df['GrLivArea'] + df['BsmtLivingArea']
+
+        for cond in t.schema['columns']['Condition1']['categories']:
+            if cond != 'Norm':
+                cname = 'HasCondition_'+cond
+                df[cname] = (df['Condition1'] == cond)*1 + \
+                    (df['Condition2'] == cond)*1
+                t.schema['columns'][cname] = {'type': 'NUMERIC'}
+
+                cname = 'HasCondition2_'+cond
+                df[cname] = (df['HasCondition_'+cond] > 0)*1
+                t.schema['columns'][cname] = {'type': 'NUMERIC'}
+
+        # Timeline: Built / remodeled / sold
+
+        # differences
+        df["AgeWhenSold"] = df["YrSold"] - df["YearBuilt"]
+        df["AgeWhenLastRemod"] = df["YearRemodAdd"] - df["YearBuilt"]
+        df["YearsSinceLastRemodel"] = df["YrSold"] - df["YearRemodAdd"]
+        df['YearsSinceLastRemodel'][df["YearsSinceLastRemodel"] < 0] = 0
+        df["OneFloorOnly"] = (df["2ndFlrSF"] == 0)*1
+        df["SummerSale"] = (df["MoSold"] == 5)*1+(df["MoSold"] == 6)*1+(df["MoSold"] == 7)*1
+
+        # binaries
+        df["BuiltSoldSameYear"] = (df["YearBuilt"] == df["YrSold"]) * 1
+        df["Remodeled"] = (df["YearRemodAdd"] != df["YearBuilt"]) * 1
+        df["RemodeledSoldSameYear"] = (df["YearRemodAdd"] == df["YrSold"]) * 1
 
         df['TotalSF'] = df['TotalBsmtSF'] + df['1stFlrSF'] + df['2ndFlrSF']
+        df['ExtraGarageAreaApprox'] = (df["GarageType"] == 'Basment') * \
+            df["GarageArea"] + (df["GarageType"] ==
+                                '2Types') * df["GarageArea"]
+        df['TotalSF_with_garage'] = df['TotalSF'] + df['ExtraGarageAreaApprox']
+        df['TotalPorch'] = df['WoodDeckSF'] + df['OpenPorchSF'] + \
+            df['3SsnPorch'] + df['ScreenPorch'] + df['EnclosedPorch']
+        df['TotalSF_with_garage_porch'] = df['TotalSF_with_garage']+df['TotalPorch']
+
+        df['RoofMatl=CompShg'] = (df['RoofMatl'] =='CompShg') * 1
 
     t.df_transform(transform_df)
+    t.drop_column('IsBsmtType1Living')
+    t.drop_column('IsBsmtType2Living')
+    t.drop_column('Condition1')
+    t.drop_column('Condition2')
+    t.drop_column('ExtraGarageAreaApprox')
+    t.drop_column('RoofMatl')
 
-    t.schema['columns']['TotalSF'] = {'type': 'NUMERIC'}
+    for c in ['AgeWhenLastRemod', 'YearsSinceLastRemodel', 'Remodeled', 'DateSold', 'AgeWhenSold', 'BuiltSoldSameYear', 'RemodeledSoldSameYear',
+              'TotalSF', 'TotalSF_with_garage', 'TotalPorch', 'TotalSF_with_garage_porch', 'BsmtFinishedSF',
+              'TotalRooms', 'BsmtLivingArea', 'TotalLivingArea', 'BsmtUnfSFPct',
+              'IsMSSubClassPUD','OneFloorOnly','SummerSale','RoofMatl=CompShg']:
+        t.schema['columns'][c] = {'type': 'NUMERIC'}
+
+    for cq in ['Overall', 'Bsmt', 'Exter', 'Garage']:
+        t.schema['columns'][cq+'Cond+Qual'] = {'type': 'NUMERIC'}
+        t.schema['columns'][cq+'CondXQual'] = {'type': 'NUMERIC'}
 
     #t.separate_out_value('PoolArea', 0, 'NoPool')
 
@@ -175,17 +232,59 @@ def kaggle_default_configure(t):
 
     # NORMALIZE SOME FEATURES
     t.normalize_column_log1p('SalePrice')
-    t.normalize_column_log1p('LotArea')
-    t.normalize_column_log1p('GrLivArea')
-    t.normalize_column_log1p('1stFlrSF')
-    t.normalize_column_log1p('TotalBsmtSF')
-    t.normalize_column_log1p('TotalSF')
+    if False:
+        t.normalize_column_log1p('LotArea')
+        t.normalize_column_log1p('GrLivArea')
+        t.normalize_column_log1p('1stFlrSF')
+        t.normalize_column_log1p('TotalBsmtSF')
+        t.normalize_column_log1p('TotalSF')
+        t.normalize_column_log1p('TotalSF_with_garage')
+        t.normalize_column_log1p('TotalSF_with_garage_porch')
+
+        t.normalize_column_log1p('BsmtUnfSF')
+        t.normalize_column_log1p('BsmtFinishedSF')
+        t.normalize_column_log1p('BsmtLivingArea')
+        t.normalize_column_log1p('TotalLivingArea')
+
+    # for c in ['SalePrice', 'LotArea', 'GrLivArea', '1stFlrSF', 'TotalBsmtSF',
+    #          'TotalSF', 'TotalSF_with_garage', 'TotalPorch', 'TotalSF_with_garage_porch']:
+    #    t.normalize_column_log1p(c)
+
+    #t.duplicate_column('TotalSF','TotalSF_l3')
+    #t.linearize_column_with_polynomial_x_transform('TotalSF_l3',order=3)
+    #t.duplicate_column('OverallQual','OverallQual_l2')
+    #t.linearize_column_with_polynomial_x_transform('OverallQual_l2',order=2)
 
     if False:
         for c in t.numerical_columns():
             t.regularize_linear_numerical_singularity(c, 0)
 
     return t
+
+
+def training_train_test_holdout(holdout=300, exclude_outliers=True):
+
+    for i in range(50):
+        print 'WWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAAWWWWWWWWWAAAAAAAAAAAA'
+
+    df_train = shuffle(pd.read_csv('../data/train.csv'), random_state=seed())
+
+    df_test = df_train[-holdout:].copy()
+    print df_test.head()
+
+    test_labels = df_test['SalePrice'].copy()
+    df_test.drop(['SalePrice'], axis=1, inplace=True)
+
+    df_train = df_train[:-holdout].copy()
+
+    #df_test = pd.read_csv('../data/test.csv')
+    schema = yaml.safe_load(open('../schema.yaml', 'r').read())
+
+    t = Training(df_train, df_test, schema=schema)
+    t.test_labels = test_labels
+    t.y2_labels = t.labels.values[-holdout:].copy()
+
+    return kaggle_default_configure(t)
 
 
 if __name__ == "__main__":

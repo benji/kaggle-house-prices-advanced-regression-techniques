@@ -19,7 +19,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-def dummify_col_with_schema(col, schema, df_train, df_test=None):
+def dummify_col_with_schema(col, schema, df_train, df_test=None,strict_check=True):
     if not col in df_train.columns:
         raise Exception('Could\'t find column', col, ' in training dataset')
 
@@ -67,7 +67,7 @@ def dummify_col_with_schema(col, schema, df_train, df_test=None):
             meaningful_columns.append(nc)
         schema['columns'][nc] = {'type': 'NUMERIC'}
 
-    if len(meaningful_columns) == 0:
+    if len(meaningful_columns) == 0 and strict_check:
         print df_train[col].head()
         raise Exception('Dumification of column', col,
                         'resulted in no meaningful columns')
@@ -91,26 +91,11 @@ def dummify_col_with_schema(col, schema, df_train, df_test=None):
     return df_train, df_test
 
 
-# expects np arrays
-# deprecated
-def __custom_rmse_using_kfolds(trainFn,
-                             predictFn,
-                             X,
-                             y,
-                             n_splits=10,
-                             doShuffle=True,
-                             scale=True):
-    return custom_score_using_kfolds(trainFn,
-                                     predictFn,
-                                     rmse,
-                                     X,
-                                     y,
-                                     n_splits,
-                                     doShuffle,
-                                     scale)
+def mean_prediction_score(scoreFn, y_true):
+    y_test = np.array([y_true.mean() for _ in y_true])
+    return scoreFn(y_test, y_true)
 
 
-# expects np arrays
 def custom_score_using_kfolds(trainFn,
                               predictFn,
                               scoreFn,
@@ -118,18 +103,16 @@ def custom_score_using_kfolds(trainFn,
                               y,
                               n_splits=10,
                               doShuffle=True,
-                              seed=-1):
+                              seed=-1, average_over_n=1):
 
     scores = []
-    kf = KFold(n_splits=n_splits, shuffle=doShuffle)
-    split_i = 1
+    for i in range(average_over_n):
+        kf = KFold(n_splits=n_splits, shuffle=doShuffle)
 
-    for train, test in kf.split(X):
-        score = doScore(trainFn, predictFn, scoreFn,
-                        X[train], X[test], y[train], y[test])
-        #print 'split', split_i, 'score', score
-        scores.append(score)
-        split_i += 1
+        for train, test in kf.split(X):
+            score = doScore(trainFn, predictFn, scoreFn,
+                            X[train], X[test], y[train], y[test])
+            scores.append(score)
 
     return np.mean(scores)
 

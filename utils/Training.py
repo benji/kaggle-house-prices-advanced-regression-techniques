@@ -2,16 +2,21 @@ import pandas as pd
 import numpy as np
 import sys
 import os
+import operator
 import yaml
 import copy
+from sklearn.base import clone
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import QuantileTransformer, RobustScaler
 from sklearn.decomposition import PCA, KernelPCA
+from sklearn.neighbors import NearestNeighbors
 from random import random
 import statsmodels
 import statsmodels.api as smapi
 from statsmodels.formula.api import ols
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 from utils import *
@@ -21,6 +26,8 @@ class Training:
 
     def __init__(self, df_train=None, df_test=None, schema=None):
         self.verbose = True
+        self.df_scores = None
+        self.strict_check = True
 
         # private stuff
         self.y_restore_transforms = []
@@ -92,7 +99,7 @@ class Training:
         t2.targetcol = self.targetcol
         return t2
 
-    def save(self, folder):
+    def save(self, folder, index=False, with_scores=False):
         if not os.path.exists(folder):
             os.makedirs(folder)
 
@@ -100,14 +107,23 @@ class Training:
         train[self.idcol] = self.train_ids
         train[self.targetcol] = self.labels
 
+        if with_scores:
+            train['score'] = self.df_scores
+
         print 'Saving train data to ', folder + '/train.csv'
-        train.to_csv(folder + '/train.csv', index=False)
+        train.to_csv(folder + '/train.csv', index=index)
 
         test = self.df_test.copy()
         test[self.idcol] = self.test_ids
 
         print 'Saving test data to ', folder + '/test.csv'
-        test.to_csv(folder + '/test.csv', index=False)
+        test.to_csv(folder + '/test.csv', index=index)
+
+        if self.df_scores is not None:
+            scores = self.df_scores
+            scores[self.idcol] = self.train_ids
+            print 'Saving test data to ', folder + '/scores.csv'
+            scores.to_csv(folder + '/scores.csv', index=index)
 
         print 'Saving schema to ', folder + '/schema.yaml'
         with open(folder + '/schema.yaml', 'w') as outfile:
@@ -290,16 +306,22 @@ class Training:
             if self.schemaget(self.schema['columns'][c], 'possibly_numerical'):
                 self.duplicate_column(c, c+'_numerical')
                 self.convert_categorical_column_to_numerical(c+'_numerical')
+            elif self.schemaget(self.schema['columns'][c], 'meaningful_order'):
+                self.duplicate_column(c, c+'_numerical')
+                self.label_encode_column(c+'_numerical')
 
     def df_transform(self, transform_fn):
         transform_fn(self.df_train)
         if self.df_test is not None:
             transform_fn(self.df_test)
 
-    def shuffle(self):
-        print "Everyday I'm shuffling..."
+    def shuffle(self,seed=None):
+        if self.verbose:
+            print "Everyday I'm shuffling..."
         perm = np.random.permutation(self.df_train.index)
+        np.random.RandomState(seed=seed).permutation(self.df_train.index)
         self.df_train = self.df_train.reindex(perm)
+        self.train_ids = self.train_ids.reindex(perm)
         self.labels = self.labels.reindex(perm)
 
     ###### ADD / REMOVE COLUMNS / ROWS #####
@@ -307,9 +329,12 @@ class Training:
     def duplicate_column(self, c, newcol):
         if self.verbose:
             print 'Creating new column', newcol
+
         self.df_train[newcol] = self.df_train[c]
+
         if self.df_test is not None:
             self.df_test[newcol] = self.df_test[c]
+
         self.schema['columns'][newcol] = copy.deepcopy(
             self.schema['columns'][c])
 
@@ -514,14 +539,21 @@ class Training:
         test_regulars = [True]*(self.df_test.shape[0])
 
         if singurality is not None:
+            singulars = self.df_train[c] == singurality
+            if singulars.shape[0] == 0:
+                return False
             regulars = self.df_train[c] != singurality
             test_regulars = self.df_test[c] != singurality
 
         has_train_singulars = (nrows - len(regulars) > 0)
 
         # curve fit
+        if self.df_train[c][regulars].nunique() < 2:
+            return False
+
         x = self.df_train[c][regulars].values
         y = self.labels[regulars]
+
         orderedfit, coefs = generate_least_square_best_fit(x, y, order)
 
         self.df_train[c][regulars] = orderedfit(x)
@@ -648,7 +680,7 @@ class Training:
         if self.verbose:
             print 'Dummifying columns', c
         self.df_train, self.df_test = dummify_col_with_schema(
-            c, self.schema, self.df_train, self.df_test)
+            c, self.schema, self.df_train, self.df_test, strict_check=self.strict_check)
         return True
 
     def label_encode_all_categoricals(self):
@@ -672,7 +704,7 @@ class Training:
 
             # this can be really bad
             unseen = df[c][~df[c].isin(cats)]
-            if len(unseen) > 0 and fail_on_unseen:
+            if len(unseen) > 0 and fail_on_unseen and self.strict_check:
                 print 'ERROR: unseen values detected during label encoding for column', c
                 print unseen[:5]
                 sys.exit(1)
@@ -681,7 +713,7 @@ class Training:
             for idx, cat in enumerate(cats):
                 df[c][df[c] == cat] = idx
 
-        if self.df_train[c].nunique() == 1:
+        if self.df_train[c].nunique() == 1 and self.strict_check:
             print 'Label encoding of column', c, 'has only 1 value', self.df_train[c].iloc[0]
             return False
 
@@ -751,6 +783,8 @@ class Training:
 
         return True
 
+    ########## OUTLIERS TOOLBOX ###########
+
     def autoremove_ouliers2(self):
         print 'Starting outliers detection...'
         x = self.df_train.values
@@ -783,3 +817,151 @@ class Training:
         results = model.fit()
         outliers_test = results.outlier_test().sort_values('bonf(p)')
         return outliers_test
+
+    def find_worst_predicted_points(self, model, score_fn):
+        scores = {}
+        for index, row in self.df_train.iterrows():
+            y_pred = model.predict([row])
+            y_true = np.array([self.labels[index]])
+            score = score_fn(y_pred, y_true)
+            #print 'index', index, 'pred',y_pred,'true',y_true,'score',score
+            scores[index] = score
+
+        return self.sort_dict_by_value(scores, reverse=True)
+
+    def lasso_stats(self, lasso_model, print_n_first_important_cols=20, plot=False):
+        col_to_coef = {}
+        for i, col in enumerate(self.df_train.columns):
+            col_to_coef[col] = np.abs(lasso_model.coef_[i])
+        sorted_col_to_coef = self.sort_dict_by_value(
+            col_to_coef, reverse=True)[:print_n_first_important_cols]
+
+        for item in sorted_col_to_coef:
+            col = item[0]
+            s = len(self.df_train) - self.find_most_popular_value_count(col)
+            print 'Lasso coef', item[0], item[1], '('+str(s)+')'
+
+        print 'Lasso intercept', lasso_model.intercept_
+        print 'Lasso iterations', lasso_model.n_iter_
+
+        if plot:
+            self.barplot_dict(sorted_col_to_coef)
+
+    def barplot_dict(self, thedict):
+        print thedict[:10]
+        sns.barplot(x=['_'+str(i[0]) for i in thedict], y=[i[1]
+                                                           for i in thedict])
+        plt.show()
+
+    def sort_dict_by_value(self, thedict, reverse=False):
+        return sorted(thedict.items(), key=lambda x: x[1], reverse=reverse)
+
+    def find_nearest_train_neighbor_indexes(self, row, dim_scaling_ratios=None, n_neighbors=5, ignore_first=False):
+        neigh = NearestNeighbors()
+        X = self.df_train.values
+
+        if dim_scaling_ratios is not None:
+            X = X*dim_scaling_ratios
+            row = row*dim_scaling_ratios
+
+        neigh.fit(self.df_train.values)
+
+        if ignore_first:
+            n_neighbors += 1
+
+        neigh_distances, neigh_indexes = neigh.kneighbors(
+            [row], n_neighbors=n_neighbors, return_distance=True)
+
+        neigh_indexes = neigh_indexes[0]
+        #neigh_distances = neigh_distances[0]
+        #print neigh_distances
+
+        return neigh_indexes[1:]
+
+    def train_id_to_index(self, id):
+        return self.train_ids.tolist().index(id)
+
+    def train_index_to_id(self, index):
+        return self.train_ids[index]
+
+    def report_out_of_range_series(self, c, oor, expected):
+        if oor.shape[0] > 0:
+            print 'Out of range rows found in test set for column', c, 'expected:', expected
+            for idx, row in oor.iterrows():
+                print 'Index:', idx, 'value:', row[c]
+
+    def find_out_of_range_test_data(self):
+        for c in self.categorical_columns():
+            values = self.df_train[c].unique()
+            out_of_range_test = self.df_test[~self.df_test[c].isin(values)]
+            self.report_out_of_range_series(c, out_of_range_test, values)
+
+        for c in self.numerical_columns():
+            min = self.df_train[c].min()
+            out_of_range_test1 = self.df_test[self.df_test[c] < min]
+            self.report_out_of_range_series(
+                c, out_of_range_test1, 'min:'+str(min))
+
+            max = self.df_train[c].max()
+            out_of_range_test2 = self.df_test[self.df_test[c] > max]
+            self.report_out_of_range_series(
+                c, out_of_range_test2, 'max:'+str(max))
+
+    def compute_scores(self, model0, scoreFn):
+        model = clone(model0)
+        model.fit(self.df_train.values, self.labels.values)
+
+        predicted = model.predict(self.df_train.values)
+        scores = [scoreFn(a, b) for a, b in zip(predicted, self.labels.values)]
+
+        self.df_scores = pd.DataFrame(
+            data={'score': scores}, index=self.df_train.index)
+        return self.df_scores
+
+    def print_row_stats_by_index(self, idx, max_categorical_pct=5, max_numerical_pct=5):
+        row = self.df_train.loc[idx]
+
+        print 'row idx', idx, 'id', self.train_ids.loc[idx], 'stats for NUMERIC columns:'
+        col_to_stat = {}
+        for c in self.numerical_columns():
+            val = row[c]
+            n_matches = self.df_train[self.df_train[c] == val].shape[0]
+            pct = n_matches * 100 / self.df_train.shape[0]
+            if pct > max_numerical_pct:
+                pass
+            else:
+                n_above = self.df_train[self.df_train[c] >= val].shape[0]
+                pct = n_above * 100 / self.df_train.shape[0]
+                if pct <= max_numerical_pct:
+                    print 'Column', c, '=', val, 'is in the top', pct, '% of the train set (', n_above, ')'
+                    pass
+
+                n_below = self.df_train[self.df_train[c] <= val].shape[0]
+                pct = n_below * 100 / self.df_train.shape[0]
+                if pct <= max_numerical_pct:
+                    print 'Column', c, '=', val, 'is in the bottom', pct, '% of the train set (', n_below, ')'
+                    pass
+
+        for item in self.sort_dict_by_value(col_to_stat):
+            print 'Column', item[0], '=', row[item[0]]
+
+        print 'row idx', idx, 'stats for CATEGORICAL columns:'
+        col_to_stat = {}
+        for c in self.categorical_columns():
+            matches = self.df_train[self.df_train[c] == row[c]]
+            col_to_stat[c] = matches.shape[0]
+
+        for item in self.sort_dict_by_value(col_to_stat):
+            pct = item[1] * 100 / self.df_train.shape[0]
+            if pct > max_categorical_pct:
+                break
+            print 'Column', item[0], '=', row[
+                item[0]], 'matches', pct, '% of the train set (', item[1], ')'
+
+    def find_most_popular_value_count(self, col):
+        cmax = 0
+        for v in self.df_train[col].unique():
+            c = len(self.df_train[self.df_train[col] == v])
+            if c > cmax:
+                cmax = c
+        return cmax

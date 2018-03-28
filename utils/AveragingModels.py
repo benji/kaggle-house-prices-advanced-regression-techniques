@@ -18,8 +18,13 @@ class AveragingModels(BaseEstimator, RegressorMixin, TransformerMixin):
         return self
 
     # Now we do the predictions for cloned models and average them
-    def predict(self, X):
+    def predict(self, X, weights=None):
         predictions = np.column_stack([
             model.predict(X) for model in self.models_
         ])
-        return np.mean(predictions, axis=1)
+
+        if weights is None:
+            weights = np.ones(len(self.models))
+
+        print weights
+        return np.average(predictions, weights=weights, axis=1)
